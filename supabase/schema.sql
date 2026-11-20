@@ -236,15 +236,17 @@ begin
   delete from booths where id = p_booth;
 end $$;
 
+drop function if exists public.admin_stats(text);
 create or replace function public.admin_stats(p_admin text)
-returns table(booth_id text, guestbook bigint, cards bigint, visitors bigint)
+returns table(booth_id text, guestbook bigint, cards bigint, visitors bigint, photos bigint)
 language plpgsql security definer set search_path = public as $$
 begin
   if not _admin_ok(p_admin) then raise exception 'denied'; end if;
   return query select b.id,
     (select count(*) from guestbook g where g.booth_id = b.id and not g.hidden),
     (select count(*) from cards c where c.booth_id = b.id),
-    (select count(distinct v.visitor) from visits v where v.booth_id = b.id)
+    (select count(distinct v.visitor) from visits v where v.booth_id = b.id),
+    (select count(*) from photos p where p.booth_id = b.id and not p.hidden)
   from booths b;
 end $$;
 
@@ -261,11 +263,54 @@ grant execute on function public.admin_reset_pin(text, text)                    
 grant execute on function public.admin_delete_booth(text, text)                      to anon, authenticated;
 grant execute on function public.admin_stats(text)                                   to anon, authenticated;
 
+-- ---------- 사진첩 ----------
+create table if not exists public.photos (
+  id          uuid primary key default gen_random_uuid(),
+  booth_id    text not null references public.booths(id) on delete cascade,
+  url         text not null check (url ~ '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/uploads/photos/[0-9a-f-]{36}\.(jpg|png|webp)$'),
+  caption     text not null default '' check (char_length(caption) <= 80),
+  nick        text not null default '익명' check (char_length(nick) between 1 and 20),
+  by_team     boolean not null default false,
+  hidden      boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists photos_booth_at on public.photos (booth_id, created_at desc);
+alter table public.photos enable row level security;
+drop policy if exists photos_read on public.photos;
+create policy photos_read on public.photos for select to anon, authenticated using (not hidden);
+drop policy if exists photos_insert on public.photos;
+create policy photos_insert on public.photos for insert to anon, authenticated with check (not hidden and not by_team);
+revoke all on public.photos from anon, authenticated;
+grant select, insert on public.photos to anon, authenticated;
+
+-- 팀이 올린 사진 (TEAM 표시)
+create or replace function public.add_team_photo(p_booth text, p_pin text, p_url text, p_caption text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not _can_edit(p_booth, p_pin) then raise exception 'denied'; end if;
+  insert into photos(booth_id, url, caption, nick, by_team)
+  values (p_booth, p_url, coalesce(p_caption, ''), coalesce(nullif((select name from booths where id = p_booth), ''), '팀'), true);
+end $$;
+
+create or replace function public.set_photo_hidden(p_booth text, p_pin text, p_id uuid, p_hidden boolean)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not _can_edit(p_booth, p_pin) then raise exception 'denied'; end if;
+  update photos set hidden = p_hidden where id = p_id and booth_id = p_booth;
+end $$;
+
+grant execute on function public.add_team_photo(text, text, text, text)           to anon, authenticated;
+grant execute on function public.set_photo_hidden(text, text, uuid, boolean)       to anon, authenticated;
+
 -- ---------- 실시간 방명록 (미니룸 말풍선) ----------
 do $$ begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
      and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'guestbook') then
     alter publication supabase_realtime add table public.guestbook;
+  end if;
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'photos') then
+    alter publication supabase_realtime add table public.photos;
   end if;
 end $$;
 
@@ -277,7 +322,7 @@ on conflict (id) do update set public = true, file_size_limit = 5242880, allowed
 
 drop policy if exists "mangle upload" on storage.objects;
 create policy "mangle upload" on storage.objects for insert to anon, authenticated
-  with check (bucket_id = 'uploads' and (storage.foldername(name))[1] in ('cards', 'logos'));
+  with check (bucket_id = 'uploads' and (storage.foldername(name))[1] in ('cards', 'logos', 'photos'));
 
 -- ---------- 테스트용 예시 부스 (슈퍼말차) ----------
 insert into public.booths (id, no, name, logo_url, logo_fit, profile) values (

@@ -22,7 +22,7 @@ const sess = {
 const configured = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(SUPABASE_URL) && !SUPABASE_ANON_KEY.startsWith('YOUR');
 const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } }) : null;
 
-const S = { mem: {}, booths: {}, ready: false, gb: [], cards: [], visits: { today: 0, total: 0 }, tab: 'home', cur: null, editing: false, sent: {}, admin: { stats: {}, issued: [] } };
+const S = { mem: {}, booths: {}, ready: false, gb: [], photos: [], cards: [], visits: { today: 0, total: 0 }, tab: 'home', cur: null, editing: false, sent: {}, admin: { stats: {}, issued: [] } };
 const app = $('#app');
 const visitor = store.get('visitor') || (() => { const v = uuid(); store.set('visitor', v); return v; })();
 const route = () => decodeURIComponent(location.hash.slice(1)).replace(/[^a-z0-9-]/gi, '').toLowerCase();
@@ -128,6 +128,10 @@ async function loadGb(id) {
     S.gb = data; S.gbLoaded = id; fillGb(); fillRecent(); fillRoom(fresh);
   }
 }
+async function loadPhotos(id) {
+  const { data, error } = await sb.from('photos').select('id,url,caption,nick,by_team,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(120);
+  if (!error && route() === id) { S.photos = data; fillStrip(); fillAlbum(); }
+}
 async function loadVisit(id) {
   const { data } = await sb.rpc('record_visit', { p_booth: id, p_visitor: visitor });
   if (data && route() === id) { S.visits = data; if ($('#cToday')) { $('#cToday').textContent = data.today; $('#cTotal').textContent = data.total; } }
@@ -191,7 +195,7 @@ function renderBooth(id) {
   if (!b) { app.innerHTML = `<div class="dirpanel"><p class="empty">${S.ready ? '이 주소의 부스를 찾을 수 없어요.' : '미니홈피를 불러오는 중이에요…'}</p><a class="btn ghost" href="#" style="justify-self:start">전체 부스 보기</a></div>`; return; }
   const team = !!pinOf(id);
   const others = Object.values(S.booths).filter(o => o.id !== id).sort((a, c) => String(a.no).localeCompare(String(c.no), 'ko', { numeric: true }));
-  const T = [['home', '홈'], ['brand', '브랜드'], ['gb', '방명록'], ['card', '명함']];
+  const T = [['home', '홈'], ['brand', '브랜드'], ['gb', '방명록'], ['card', '명함'], ['album', '사진첩']];
   document.title = `${b.name}의 미니홈피 · 맹글아케이드`;
   app.innerHTML = `<div class="frame">
   <aside class="panel side">
@@ -229,9 +233,10 @@ function renderTab(id, b) {
   const el = $('#body');
   if (S.tab === 'home') {
     el.innerHTML = `<div class="room"><span class="live"><i></i>LIVE 방명록 <b id="liveCount">${S.gb.length}</b></span>${room(b)}<div class="crowd" id="crowd"></div></div>
-    <div class="two"><div class="box"><h2>새 소식</h2><p>${esc(b.news || '아직 소식이 없어요.')}</p></div>
-    <div class="box"><h2>최근 방명록 <em id="gbCount">${S.gb.length}</em></h2><div id="recent"></div></div></div>`;
-    fillRecent(); fillRoom(); if (S.gb[0]) setTimeout(() => speak(S.gb[0].id), 500);
+    <div class="box"><div class="boxhead"><h2>사진첩 <em id="phCount">${S.photos.length}</em></h2><button class="link" id="toAlbum">전체 보기 →</button></div><div class="strip" id="strip"></div></div>
+    <div class="box"><h2>최근 방명록 <em id="gbCount">${S.gb.length}</em></h2><div id="recent"></div></div>`;
+    $('#toAlbum').onclick = () => { S.tab = 'album'; renderBooth(id); };
+    fillRecent(); fillStrip(); fillRoom(); if (S.gb[0]) setTimeout(() => speak(S.gb[0].id), 500);
   }
   if (S.tab === 'brand') {
     el.innerHTML = `${b.slogan ? `<p class="quote">“${esc(b.slogan)}”</p>` : ''}
@@ -263,6 +268,7 @@ function renderTab(id, b) {
     fillGb();
   }
   if (S.tab === 'card') renderCard(id, b);
+  if (S.tab === 'album') renderAlbum(id, b);
 }
 
 function fillRecent() {
@@ -311,9 +317,84 @@ function fillCards() {
   el.innerHTML = S.cards.length ? S.cards.map(c => `<article>${c.img_url ? `<a href="${esc(c.img_url)}" target="_blank" rel="noopener">${imgTag(c.img_url, c.name + ' 명함')}</a>` : ''}<div><b>${esc(c.name)}</b> ${esc(c.role)}<br>${esc(c.org)}<br>${esc(c.tel)} ${esc(c.mail)}${c.memo ? `<p class="note" style="margin-top:6px">${esc(c.memo)}</p>` : ''}<p class="note">${stamp(c.created_at)}</p></div></article>`).join('') : '<p class="empty">아직 받은 명함이 없어요.</p>';
 }
 
+// ---------- 사진첩 ----------
+function photoMeta(p) { return `${p.by_team ? '<span class="team">TEAM</span> ' : ''}<b>${esc(p.nick)}</b> · ${stamp(p.created_at)}`; }
+function fillStrip() {
+  const el = $('#strip'); if (!el) return; if ($('#phCount')) $('#phCount').textContent = S.photos.length;
+  el.innerHTML = S.photos.length ? S.photos.slice(0, 12).map((p, i) => `<button class="shot" data-open="${i}" aria-label="사진 크게 보기${p.caption ? ': ' + esc(p.caption) : ''}">${imgTag(p.url, p.caption || '부스 사진')}${p.caption ? `<span>${esc(p.caption)}</span>` : ''}</button>`).join('')
+    : '<p class="empty">아직 사진이 없어요. 사진첩 탭에서 첫 사진을 올려 주세요.</p>';
+  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open));
+}
+function renderAlbum(id, b) {
+  const el = $('#body'); const team = !!pinOf(id);
+  el.innerHTML = `<form class="gbform" id="pf">
+    <div><h2>사진 올리기</h2><p class="note">부스에서 찍은 사진을 남겨 주세요. 한 번에 5장까지 올릴 수 있어요.</p></div>
+    <label class="drop"><span id="pDropTxt"><b>사진 고르기</b><br><span class="note">눌러서 촬영하거나 사진을 골라 주세요</span></span><span class="pprev" id="pPrev" hidden></span><input type="file" id="pFile" accept="image/*" multiple></label>
+    <input class="nick" id="pCap" maxlength="80" placeholder="사진 설명 (선택)" aria-label="사진 설명" style="width:100%">
+    ${team ? `<label class="check"><input type="checkbox" id="asTeam" checked>팀 사진으로 올리기 (TEAM 표시)</label>` : ''}
+    <div class="row" id="pWho"><div class="seg" role="radiogroup" aria-label="올린 사람 표시"><label><input type="radio" name="pwho" value="nick" checked>닉네임</label><label><input type="radio" name="pwho" value="anon">익명</label></div>
+    <input class="nick" id="pNick" maxlength="20" aria-label="닉네임" value="${esc(store.get('nick') || rnick())}"></div>
+    <div class="row"><button class="btn" id="pBtn">사진 올리기</button><span class="note" id="pMsg" role="status"></span></div></form>
+    <div><h2>사진첩 <em id="phCount2">${S.photos.length}</em></h2><div class="album" id="album"></div></div>`;
+  let files = [];
+  const syncWho = () => { const t = $('#asTeam')?.checked; $('#pWho').hidden = !!t; };
+  $('#asTeam')?.addEventListener('change', syncWho); syncWho();
+  app.querySelectorAll('[name=pwho]').forEach(r => r.onchange = () => { $('#pNick').disabled = app.querySelector('[name=pwho]:checked').value === 'anon'; });
+  $('#pFile').onchange = async e => {
+    files = [...e.target.files].slice(0, 5); if (!files.length) return;
+    $('#pPrev').innerHTML = files.map(f => `<img src="${URL.createObjectURL(f)}" alt="">`).join(''); $('#pPrev').hidden = false; $('#pDropTxt').hidden = true;
+    if (e.target.files.length > 5) $('#pMsg').textContent = '앞의 5장만 올라가요.';
+  };
+  $('#pf').onsubmit = async e => {
+    e.preventDefault(); if (!files.length) { $('#pMsg').textContent = '사진을 먼저 골라 주세요.'; return; }
+    const caption = $('#pCap').value.trim(); const asTeam = !!$('#asTeam')?.checked;
+    const nick = app.querySelector('[name=pwho]:checked').value === 'anon' ? '익명' : ($('#pNick').value.trim() || '익명'); if (nick !== '익명') store.set('nick', nick);
+    $('#pBtn').disabled = true;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        $('#pMsg').textContent = `올리는 중… ${i + 1}/${files.length}`;
+        const url = await upload('photos', await shrink(files[i]));
+        const { error } = asTeam ? await sb.rpc('add_team_photo', { p_booth: id, p_pin: pinOf(id), p_url: url, p_caption: caption })
+          : await sb.from('photos').insert({ booth_id: id, url, caption, nick });
+        if (error) throw error;
+      }
+      files = []; $('#pFile').value = ''; $('#pCap').value = ''; $('#pPrev').hidden = true; $('#pDropTxt').hidden = false; $('#pMsg').textContent = '올렸어요!';
+      await loadPhotos(id);
+    } catch (err) { $('#pMsg').textContent = errMsg(err); }
+    $('#pBtn').disabled = false;
+  };
+  fillAlbum();
+}
+function fillAlbum() {
+  const el = $('#album'); if (!el) return; const id = route(); const team = !!pinOf(id);
+  if ($('#phCount2')) $('#phCount2').textContent = S.photos.length;
+  el.innerHTML = S.photos.length ? S.photos.map((p, i) => `<figure><button class="shot" data-open="${i}" aria-label="사진 크게 보기">${imgTag(p.url, p.caption || '부스 사진')}</button>
+    <figcaption>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}<small>${photoMeta(p)}</small>${team ? `<button class="x" data-phide="${esc(p.id)}">숨기기</button>` : ''}</figcaption></figure>`).join('')
+    : '<p class="empty">아직 사진이 없어요.</p>';
+  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open));
+  el.querySelectorAll('[data-phide]').forEach(x => x.onclick = async () => {
+    if (x.dataset.armed !== '1') { x.dataset.armed = '1'; x.textContent = '한 번 더 누르면 숨김'; return; }
+    x.disabled = true; const { error } = await sb.rpc('set_photo_hidden', { p_booth: id, p_pin: pinOf(id), p_id: x.dataset.phide, p_hidden: true });
+    if (error) { x.disabled = false; note(errMsg(error)); } else loadPhotos(id);
+  });
+}
+let lbIdx = 0;
+function openPhoto(i) {
+  const dlg = $('#lightbox'); if (!S.photos.length) return;
+  lbIdx = (i + S.photos.length) % S.photos.length; const p = S.photos[lbIdx];
+  $('#lbImg').src = p.url; $('#lbImg').alt = p.caption || '부스 사진';
+  $('#lbCap').innerHTML = `${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>${photoMeta(p)} · ${lbIdx + 1}/${S.photos.length}</small>`;
+  if (!dlg.open) dlg.showModal();
+}
+$('#lbPrev').onclick = () => openPhoto(lbIdx - 1);
+$('#lbNext').onclick = () => openPhoto(lbIdx + 1);
+$('#lbClose').onclick = () => $('#lightbox').close();
+$('#lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox') $('#lightbox').close(); });
+$('#lightbox').addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openPhoto(lbIdx - 1); if (e.key === 'ArrowRight') openPhoto(lbIdx + 1); });
+
 const FIELDS = [['기본', [['name', '부스(팀) 이름'], ['short', '미니룸 간판 문구 (짧게)'], ['tagline', '한 줄 소개'], ['mood', '오늘의 기분'], ['intro', '짧은 소개']]],
 ['브랜드', [['slogan', '슬로건'], ['story', '브랜드 스토리', 1], ['values', '핵심 가치 (쉼표로 구분)'], ['products', '제품·서비스 (한 줄에 하나)', 1], ['certs', '인증 (쉼표로 구분)'], ['impact', '임팩트', 1]]],
-['정보', [['founders', '대표'], ['founded', '설립'], ['regions', '지역'], ['company', '회사'], ['insta', '인스타 아이디'], ['web', '웹사이트'], ['news', '새 소식', 1]]]];
+['정보', [['founders', '대표'], ['founded', '설립'], ['regions', '지역'], ['company', '회사'], ['insta', '인스타 아이디'], ['web', '웹사이트']]]];
 const PROFILE_KEYS = FIELDS.flatMap(([, fs]) => fs.map(f => f[0])).filter(k => k !== 'name');
 
 function renderEdit(id, b) {
@@ -384,8 +465,8 @@ async function renderAdmin() {
     <textarea class="mono" id="bulk" placeholder="01, team-01, 감귤랩&#10;02, team-02, 오름스튜디오&#10;07, supermatcha, 슈퍼말차"></textarea>
     <div class="row"><button class="btn" id="bulkBtn">등록하기</button><span class="note" id="bulkMsg" role="status"></span></div></section>
   <section><h2>부스 목록</h2>
-    ${list.length ? `<div class="scroll"><table class="tbl stack"><thead><tr><th>번호</th><th>팀</th><th>QR 주소</th><th class="num">방문</th><th class="num">방명록</th><th class="num">명함</th><th></th></tr></thead><tbody>
-    ${list.map(b => { const s = S.admin.stats[b.id] || {}; return `<tr><td>${esc(b.no || '--')}</td><td><b>${esc(b.name)}</b></td><td><a href="#${esc(b.id)}">${esc(base)}#${esc(b.id)}</a></td><td class="num">${s.visitors ?? 0}</td><td class="num">${s.guestbook ?? 0}</td><td class="num">${s.cards ?? 0}</td>
+    ${list.length ? `<div class="scroll"><table class="tbl stack"><thead><tr><th>번호</th><th>팀</th><th>QR 주소</th><th class="num">방문</th><th class="num">방명록</th><th class="num">명함</th><th class="num">사진</th><th></th></tr></thead><tbody>
+    ${list.map(b => { const s = S.admin.stats[b.id] || {}; return `<tr><td>${esc(b.no || '--')}</td><td><b>${esc(b.name)}</b></td><td><a href="#${esc(b.id)}">${esc(base)}#${esc(b.id)}</a></td><td class="num">${s.visitors ?? 0}</td><td class="num">${s.guestbook ?? 0}</td><td class="num">${s.cards ?? 0}</td><td class="num">${s.photos ?? 0}</td>
       <td><div class="acts"><button class="btn ghost small" data-reset="${esc(b.id)}">PIN 재발급</button><button class="btn ghost small" data-del="${esc(b.id)}">삭제</button></div></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="empty">아직 등록된 부스가 없어요.</p>'}
   </section>
   <section><h2>참고</h2><p class="note">관리자 비밀번호는 모든 부스의 팀 PIN 대신 쓸 수 있어요. 각 부스 미니홈피의 '팀 로그인'에 관리자 비밀번호를 넣으면 그 부스의 내용 수정, 받은 명함 보기, 방명록 숨기기를 할 수 있어요.</p></section>
@@ -442,8 +523,9 @@ function startLive(id) {
   // 새 방명록이 들어오면 바로 다시 불러와요 (Supabase Realtime). 연결이 안 되는 환경을 위해 20초 새로고침도 함께 둬요.
   live = sb.channel('gb-' + id)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guestbook', filter: 'booth_id=eq.' + id }, () => loadGb(id))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photos', filter: 'booth_id=eq.' + id }, () => loadPhotos(id))
     .subscribe();
-  gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) loadGb(id); }, 20000);
+  gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) { loadGb(id); loadPhotos(id); } }, 20000);
   startChatter();
 }
 async function render() {
@@ -453,8 +535,8 @@ async function render() {
   document.title = '맹글아케이드 부스 미니홈피';
   if (!id) { stopLive(); renderDir(); return; }
   if (id !== S.cur) {
-    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.cards = []; S.visits = { today: 0, total: 0 };
-    renderBooth(id); loadGb(id); loadVisit(id); startLive(id);
+    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.photos = []; S.cards = []; S.visits = { today: 0, total: 0 };
+    renderBooth(id); loadGb(id); loadPhotos(id); loadVisit(id); startLive(id);
   } else renderBooth(id);
 }
 addEventListener('hashchange', () => { if (route() !== S.cur) S.cur = null; render(); });
