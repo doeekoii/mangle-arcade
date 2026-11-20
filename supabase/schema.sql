@@ -93,6 +93,14 @@ create policy cards_insert on public.cards for insert to anon, authenticated wit
 
 -- booth_secrets, app_secrets, pin_attempts, visits 에는 정책이 없어서 직접 접근 불가 (함수로만)
 
+-- 테이블 권한: 필요한 것만 명시적으로 열어요 ('새 테이블 자동 API 권한' 설정이 꺼져 있어도 동작)
+grant usage on schema public to anon, authenticated;
+revoke all on public.booths, public.booth_secrets, public.app_secrets, public.pin_attempts,
+              public.guestbook, public.cards, public.visits from anon, authenticated;
+grant select on public.booths to anon, authenticated;
+grant select, insert on public.guestbook to anon, authenticated;
+grant insert on public.cards to anon, authenticated;
+
 -- ---------- 내부 함수 ----------
 create or replace function public._admin_ok(p_pin text)
 returns boolean language plpgsql security definer set search_path = public, extensions as $$
