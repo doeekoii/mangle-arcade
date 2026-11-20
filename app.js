@@ -22,7 +22,7 @@ const sess = {
 const configured = /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(SUPABASE_URL) && !SUPABASE_ANON_KEY.startsWith('YOUR');
 const sb = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } }) : null;
 
-const S = { mem: {}, booths: {}, ready: false, gb: [], photos: [], cards: [], visits: { today: 0, total: 0 }, tab: 'home', cur: null, editing: false, sent: {}, admin: { stats: {}, issued: [] } };
+const S = { mem: {}, booths: {}, ready: false, gb: [], photos: [], liked: new Set(), sort: 'new', cards: [], visits: { today: 0, total: 0 }, tab: 'home', cur: null, editing: false, sent: {}, admin: { stats: {}, issued: [] } };
 const app = $('#app');
 const visitor = store.get('visitor') || (() => { const v = uuid(); store.set('visitor', v); return v; })();
 const route = () => decodeURIComponent(location.hash.slice(1)).replace(/[^a-z0-9-]/gi, '').toLowerCase();
@@ -129,8 +129,10 @@ async function loadGb(id) {
   }
 }
 async function loadPhotos(id) {
-  const { data, error } = await sb.from('photos').select('id,url,caption,nick,by_team,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(120);
+  const { data, error } = await sb.from('photos').select('id,url,caption,nick,by_team,like_count,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(120);
   if (!error && route() === id) { S.photos = data; fillStrip(); fillAlbum(); }
+  const { data: mine } = await sb.rpc('my_likes', { p_booth: id, p_visitor: visitor });
+  if (mine && route() === id) { S.liked = new Set(mine.map(x => typeof x === 'string' ? x : x.my_likes)); syncLikes(); }
 }
 async function loadVisit(id) {
   const { data } = await sb.rpc('record_visit', { p_booth: id, p_visitor: visitor });
@@ -318,12 +320,35 @@ function fillCards() {
 }
 
 // ---------- 사진첩 ----------
+const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.6-4.5-9.6-9.1C1 8.1 3.1 4.6 6.6 4.6c2.1 0 3.6 1.2 5.4 3.1 1.8-1.9 3.3-3.1 5.4-3.1 3.5 0 5.6 3.5 4.2 6.8-2 4.6-9.6 9.1-9.6 9.1z"/></svg>';
+function likeBtn(p, cls = '') {
+  const on = S.liked.has(p.id);
+  return `<button class="like ${cls}${on ? ' on' : ''}" data-like="${esc(p.id)}" aria-pressed="${on}" aria-label="좋아요">${HEART}<span>${p.like_count || 0}</span></button>`;
+}
+function syncLikes() {
+  document.querySelectorAll('[data-like]').forEach(b => {
+    const p = S.photos.find(x => x.id === b.dataset.like); if (!p) return;
+    const on = S.liked.has(p.id); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = p.like_count || 0;
+  });
+  document.querySelectorAll('[data-likes]').forEach(b => { const p = S.photos.find(x => x.id === b.dataset.likes); if (p) { b.hidden = !p.like_count; b.querySelector('span').textContent = p.like_count || 0; } });
+}
+async function toggleLike(pid, onlyLike = false) {
+  const p = S.photos.find(x => x.id === pid); if (!p) return;
+  const was = S.liked.has(pid); if (onlyLike && was) return;
+  was ? S.liked.delete(pid) : S.liked.add(pid); p.like_count = Math.max(0, (p.like_count || 0) + (was ? -1 : 1)); syncLikes();
+  const { data, error } = await sb.rpc('toggle_like', { p_photo: pid, p_visitor: visitor });
+  if (error) { was ? S.liked.add(pid) : S.liked.delete(pid); p.like_count = Math.max(0, (p.like_count || 0) + (was ? 1 : -1)); syncLikes(); return; }
+  data.liked ? S.liked.add(pid) : S.liked.delete(pid); p.like_count = data.count; syncLikes();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-like]'); if (b) { e.preventDefault(); e.stopPropagation(); b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); toggleLike(b.dataset.like); } });
+const sorted = () => S.sort === 'top' ? [...S.photos].sort((a, b) => (b.like_count || 0) - (a.like_count || 0) || b.created_at.localeCompare(a.created_at)) : S.photos;
+
 function photoMeta(p) { return `${p.by_team ? '<span class="team">TEAM</span> ' : ''}<b>${esc(p.nick)}</b> · ${stamp(p.created_at)}`; }
 function fillStrip() {
   const el = $('#strip'); if (!el) return; if ($('#phCount')) $('#phCount').textContent = S.photos.length;
-  el.innerHTML = S.photos.length ? S.photos.slice(0, 12).map((p, i) => `<button class="shot" data-open="${i}" aria-label="사진 크게 보기${p.caption ? ': ' + esc(p.caption) : ''}">${imgTag(p.url, p.caption || '부스 사진')}${p.caption ? `<span>${esc(p.caption)}</span>` : ''}</button>`).join('')
+  el.innerHTML = S.photos.length ? S.photos.slice(0, 12).map((p, i) => `<button class="shot" data-open="${i}" aria-label="사진 크게 보기${p.caption ? ': ' + esc(p.caption) : ''}">${imgTag(p.url, p.caption || '부스 사진')}<em class="lc" data-likes="${esc(p.id)}" ${p.like_count ? '' : 'hidden'}>${HEART}<span>${p.like_count || 0}</span></em>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}</button>`).join('')
     : '<p class="empty">아직 사진이 없어요. 사진첩 탭에서 첫 사진을 올려 주세요.</p>';
-  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open));
+  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open, S.photos));
 }
 function renderAlbum(id, b) {
   const el = $('#body'); const team = !!pinOf(id);
@@ -335,7 +360,10 @@ function renderAlbum(id, b) {
     <div class="row" id="pWho"><div class="seg" role="radiogroup" aria-label="올린 사람 표시"><label><input type="radio" name="pwho" value="nick" checked>닉네임</label><label><input type="radio" name="pwho" value="anon">익명</label></div>
     <input class="nick" id="pNick" maxlength="20" aria-label="닉네임" value="${esc(store.get('nick') || rnick())}"></div>
     <div class="row"><button class="btn" id="pBtn">사진 올리기</button><span class="note" id="pMsg" role="status"></span></div></form>
-    <div><h2>사진첩 <em id="phCount2">${S.photos.length}</em></h2><div class="album" id="album"></div></div>`;
+    <div><div class="boxhead"><h2>사진첩 <em id="phCount2">${S.photos.length}</em></h2>
+    <div class="seg small" role="radiogroup" aria-label="정렬"><label><input type="radio" name="psort" value="new" ${S.sort === 'new' ? 'checked' : ''}>최신순</label><label><input type="radio" name="psort" value="top" ${S.sort === 'top' ? 'checked' : ''}>인기순</label></div></div>
+    <div class="album" id="album"></div></div>`;
+  app.querySelectorAll('[name=psort]').forEach(r => r.onchange = () => { S.sort = r.value; fillAlbum(); });
   let files = [];
   const syncWho = () => { const t = $('#asTeam')?.checked; $('#pWho').hidden = !!t; };
   $('#asTeam')?.addEventListener('change', syncWho); syncWho();
@@ -368,25 +396,32 @@ function renderAlbum(id, b) {
 function fillAlbum() {
   const el = $('#album'); if (!el) return; const id = route(); const team = !!pinOf(id);
   if ($('#phCount2')) $('#phCount2').textContent = S.photos.length;
-  el.innerHTML = S.photos.length ? S.photos.map((p, i) => `<figure><button class="shot" data-open="${i}" aria-label="사진 크게 보기">${imgTag(p.url, p.caption || '부스 사진')}</button>
-    <figcaption>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}<small>${photoMeta(p)}</small>${team ? `<button class="x" data-phide="${esc(p.id)}">숨기기</button>` : ''}</figcaption></figure>`).join('')
+  const list = sorted();
+  el.innerHTML = list.length ? list.map((p, i) => `<figure><button class="shot" data-open="${i}" aria-label="사진 크게 보기">${imgTag(p.url, p.caption || '부스 사진')}</button>
+    <figcaption><div class="likerow">${likeBtn(p)}${team ? `<button class="x" data-phide="${esc(p.id)}">숨기기</button>` : ''}</div>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}<small>${photoMeta(p)}</small></figcaption></figure>`).join('')
     : '<p class="empty">아직 사진이 없어요.</p>';
-  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open));
+  el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open, list));
   el.querySelectorAll('[data-phide]').forEach(x => x.onclick = async () => {
     if (x.dataset.armed !== '1') { x.dataset.armed = '1'; x.textContent = '한 번 더 누르면 숨김'; return; }
     x.disabled = true; const { error } = await sb.rpc('set_photo_hidden', { p_booth: id, p_pin: pinOf(id), p_id: x.dataset.phide, p_hidden: true });
     if (error) { x.disabled = false; note(errMsg(error)); } else loadPhotos(id);
   });
 }
-let lbIdx = 0;
-function openPhoto(i) {
-  const dlg = $('#lightbox'); if (!S.photos.length) return;
-  lbIdx = (i + S.photos.length) % S.photos.length; const p = S.photos[lbIdx];
-  $('#lbImg').src = p.url; $('#lbImg').alt = p.caption || '부스 사진';
-  $('#lbCap').innerHTML = `${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>${photoMeta(p)} · ${lbIdx + 1}/${S.photos.length}</small>`;
+let lbIdx = 0, lbList = [];
+function openPhoto(i, list = lbList) {
+  const dlg = $('#lightbox'); lbList = list; if (!lbList.length) return;
+  lbIdx = (i + lbList.length) % lbList.length; const p = lbList[lbIdx];
+  $('#lbImg').src = p.url; $('#lbImg').alt = p.caption || '부스 사진'; $('#lbImg').dataset.pid = p.id;
+  $('#lbCap').innerHTML = `<div class="likerow">${likeBtn(p, 'big')}</div>${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>${photoMeta(p)} · ${lbIdx + 1}/${lbList.length}</small>`;
   if (!dlg.open) dlg.showModal();
 }
-$('#lbPrev').onclick = () => openPhoto(lbIdx - 1);
+// 인스타그램처럼 사진을 두 번 탭하면 좋아요
+{ let last = 0;
+  const burst = () => { const h = $('#lbHeart'); h.classList.remove('go'); void h.offsetWidth; h.classList.add('go'); };
+  $('#lbImg').addEventListener('dblclick', () => { burst(); toggleLike($('#lbImg').dataset.pid, true); });
+  $('#lbImg').addEventListener('touchend', e => { const now = Date.now(); if (now - last < 300) { e.preventDefault(); burst(); toggleLike($('#lbImg').dataset.pid, true); last = 0; } else last = now; });
+}
+$('#lbPrev').onclick = () => openPhoto(lbIdx - 1);  // 같은 목록 안에서 이동
 $('#lbNext').onclick = () => openPhoto(lbIdx + 1);
 $('#lbClose').onclick = () => $('#lightbox').close();
 $('#lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox') $('#lightbox').close(); });
@@ -524,6 +559,10 @@ function startLive(id) {
   live = sb.channel('gb-' + id)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guestbook', filter: 'booth_id=eq.' + id }, () => loadGb(id))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photos', filter: 'booth_id=eq.' + id }, () => loadPhotos(id))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'photos', filter: 'booth_id=eq.' + id }, ({ new: n }) => {
+      const p = S.photos.find(x => x.id === n.id); if (!p) return;
+      if (n.hidden) { loadPhotos(id); return; } p.like_count = n.like_count; syncLikes();
+    })
     .subscribe();
   gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) { loadGb(id); loadPhotos(id); } }, 20000);
   startChatter();
@@ -535,7 +574,7 @@ async function render() {
   document.title = '맹글아케이드 부스 미니홈피';
   if (!id) { stopLive(); renderDir(); return; }
   if (id !== S.cur) {
-    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.photos = []; S.cards = []; S.visits = { today: 0, total: 0 };
+    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.photos = []; S.liked = new Set(); S.cards = []; S.visits = { today: 0, total: 0 };
     renderBooth(id); loadGb(id); loadPhotos(id); loadVisit(id); startLive(id);
   } else renderBooth(id);
 }

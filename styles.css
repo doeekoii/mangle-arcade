@@ -204,3 +204,22 @@ textarea.mono{font:14px/1.6 "Space Grotesk","Noto Sans KR";width:100%;padding:10
 .lbbar p{margin:0;font-weight:500}
 .lbbar small{color:var(--mute);font-size:12px}
 @media(max-width:700px){.tabs button{font-size:13px;padding:10px 2px}}
+/* ---- 좋아요 ---- */
+.likerow{display:flex;align-items:center;gap:10px}
+.like{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:4px 2px;min-height:36px;font:700 14px "Space Grotesk","Noto Sans KR";color:var(--ink);cursor:pointer}
+.like svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;transition:transform .15s}
+.like.on svg{fill:#ff3040;stroke:#ff3040}
+.like.pop svg{animation:pop .35s ease}
+.like.big svg{width:26px;height:26px}
+@keyframes pop{40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.lc{position:absolute;top:6px;right:6px;display:inline-flex;align-items:center;gap:3px;background:#fff;color:#111;border:1.5px solid #111;border-radius:999px;padding:1px 7px 1px 5px;font:700 11px "Space Grotesk";font-style:normal}
+.lc svg{width:11px;height:11px;fill:#ff3040}
+.lc[hidden]{display:none}
+.seg.small label{padding:5px 12px;min-height:34px;font-size:13px}
+.lbstage{position:relative;background:#111;display:grid;place-items:center}
+.lbstage img{user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.burst{position:absolute;left:50%;top:50%;width:min(28%,160px);height:auto;fill:#fff;opacity:0;transform:translate(-50%,-50%) scale(.3);pointer-events:none;filter:drop-shadow(0 4px 18px #0006)}
+.burst.go{animation:burst .9s ease forwards}
+@keyframes burst{15%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}30%{transform:translate(-50%,-50%) scale(.95)}45%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+.lbcap{display:grid;gap:2px}
+@media(prefers-reduced-motion:reduce){.like.pop svg,.burst.go{animation:none}.burst.go{opacity:0}}

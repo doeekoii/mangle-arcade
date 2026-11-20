@@ -275,11 +275,12 @@ create table if not exists public.photos (
   created_at  timestamptz not null default now()
 );
 create index if not exists photos_booth_at on public.photos (booth_id, created_at desc);
+alter table public.photos add column if not exists like_count int not null default 0;
 alter table public.photos enable row level security;
 drop policy if exists photos_read on public.photos;
 create policy photos_read on public.photos for select to anon, authenticated using (not hidden);
 drop policy if exists photos_insert on public.photos;
-create policy photos_insert on public.photos for insert to anon, authenticated with check (not hidden and not by_team);
+create policy photos_insert on public.photos for insert to anon, authenticated with check (not hidden and not by_team and like_count = 0);
 revoke all on public.photos from anon, authenticated;
 grant select, insert on public.photos to anon, authenticated;
 
@@ -301,6 +302,40 @@ end $$;
 
 grant execute on function public.add_team_photo(text, text, text, text)           to anon, authenticated;
 grant execute on function public.set_photo_hidden(text, text, uuid, boolean)       to anon, authenticated;
+
+-- ---------- 사진 좋아요 ----------
+create table if not exists public.photo_likes (
+  photo_id    uuid not null references public.photos(id) on delete cascade,
+  visitor     text not null check (char_length(visitor) between 8 and 64),
+  created_at  timestamptz not null default now(),
+  primary key (photo_id, visitor)
+);
+alter table public.photo_likes enable row level security;
+revoke all on public.photo_likes from anon, authenticated;
+
+-- 누르면 좋아요, 다시 누르면 취소. 방문자(기기)당 사진 하나에 한 번
+create or replace function public.toggle_like(p_photo uuid, p_visitor text)
+returns json language plpgsql security definer set search_path = public as $$
+declare v_liked boolean; v_count int;
+begin
+  if not exists (select 1 from photos where id = p_photo and not hidden) then raise exception 'no photo'; end if;
+  delete from photo_likes where photo_id = p_photo and visitor = p_visitor;
+  if found then v_liked := false;
+  else insert into photo_likes(photo_id, visitor) values (p_photo, p_visitor); v_liked := true;
+  end if;
+  update photos set like_count = (select count(*) from photo_likes where photo_id = p_photo) where id = p_photo
+  returning like_count into v_count;
+  return json_build_object('liked', v_liked, 'count', v_count);
+end $$;
+
+create or replace function public.my_likes(p_booth text, p_visitor text)
+returns setof uuid language sql stable security definer set search_path = public as $$
+  select l.photo_id from photo_likes l join photos p on p.id = l.photo_id
+   where p.booth_id = p_booth and l.visitor = p_visitor
+$$;
+
+grant execute on function public.toggle_like(uuid, text)  to anon, authenticated;
+grant execute on function public.my_likes(text, text)     to anon, authenticated;
 
 -- ---------- 실시간 방명록 (미니룸 말풍선) ----------
 do $$ begin
