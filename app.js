@@ -61,8 +61,57 @@ function room(b) {
 <rect x="186" y="131" width="22" height="19" rx="4" fill="#fff" ${L}/><ellipse cx="197" cy="132" rx="11" ry="4" fill="#111"/>
 <rect x="222" y="139" width="28" height="8" rx="2" fill="#fff" ${L} transform="rotate(-20 236 143)"/>
 <g><ellipse cx="335" cy="192" rx="18" ry="5" fill="#0000000f"/><path d="M322 166h26l-4 25h-18z" fill="#fff" ${L}/><circle cx="328" cy="152" r="12" fill="#fff" ${L}/><circle cx="343" cy="146" r="13" fill="#fff" ${L}/><circle cx="336" cy="134" r="11" fill="#111"/></g>
-<g class="minime"><ellipse cx="92" cy="201" rx="14" ry="4" fill="#0000000f"/><rect x="82" y="168" width="20" height="28" rx="8" fill="#111"/><circle cx="92" cy="155" r="14" fill="#fff" ${L}/><path d="M78 153q14-18 28 0" fill="#111"/><circle cx="87" cy="157" r="1.8" fill="#111"/><circle cx="97" cy="157" r="1.8" fill="#111"/></g>
+<g class="minime" id="roomHost"><ellipse cx="92" cy="201" rx="14" ry="4" fill="#0000000f"/><rect x="82" y="168" width="20" height="28" rx="8" fill="#111"/><circle cx="92" cy="155" r="14" fill="#fff" ${L}/><path d="M78 153q14-18 28 0" fill="#111"/><circle cx="87" cy="157" r="1.8" fill="#111"/><circle cx="97" cy="157" r="1.8" fill="#111"/></g>
 </svg>`;
+}
+
+// ---------- 미니룸 손님 (실시간 방명록) ----------
+// 방 바닥 위 자리 (SVG 좌표). 최신 글이 앞자리부터 차지하고, 새 글이 오면 다들 한 칸씩 옮겨 가요.
+const SLOTS = [[150, 228], [255, 226], [100, 206], [300, 196], [60, 174], [292, 150]];
+const hashN = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
+function avatar(seed) {
+  const v = hashN(seed), L = 'stroke="#111" stroke-width="1.6" stroke-linejoin="round"';
+  const hair = [
+    '<path d="M4 14q8-13 16 0z" fill="#111"/>',
+    '<path d="M4 18q-1-13 8-13t8 13h-3q-1-6-5-7-4 1-5 7z" fill="#111"/>',
+    '<path d="M4 13l3-6 2 3 3-6 3 6 2-3 3 6z" fill="#111"/>',
+    '<circle cx="12" cy="4" r="3" fill="#111"/><path d="M4 13q8-10 16 0z" fill="#111"/>',
+  ][v % 4];
+  return `<svg viewBox="0 0 24 42" aria-hidden="true"><ellipse cx="12" cy="40" rx="8" ry="2.2" fill="#0000001a"/><rect x="5" y="22" width="14" height="17" rx="6" fill="${(v >> 2) % 2 ? '#111' : '#fff'}" ${L}/><circle cx="12" cy="14" r="8" fill="#fff" ${L}/>${hair}<circle cx="9" cy="15.5" r="1.1" fill="#111"/><circle cx="15" cy="15.5" r="1.1" fill="#111"/></svg>`;
+}
+function fillRoom(fresh = []) {
+  const el = $('#crowd'); if (!el) return;
+  const list = S.gb.slice(0, SLOTS.length);
+  $('#roomHost')?.classList.toggle('gone', list.length > 0);
+  if ($('#liveCount')) $('#liveCount').textContent = S.gb.length;
+  const keep = new Set(list.map(g => g.id));
+  el.querySelectorAll('.guest').forEach(n => { if (!keep.has(n.dataset.id)) n.remove(); });
+  list.forEach((g, i) => {
+    let n = el.querySelector(`.guest[data-id="${CSS.escape(g.id)}"]`);
+    if (!n) {
+      n = document.createElement('div'); n.className = 'guest enter'; n.dataset.id = g.id;
+      n.innerHTML = `<div class="bubble"><b></b><span></span></div>${avatar(g.nick + g.id)}`;
+      n.querySelector('b').textContent = g.nick;
+      n.querySelector('span').textContent = g.msg.length > 34 ? g.msg.slice(0, 34) + '…' : g.msg;
+      el.appendChild(n); n.getBoundingClientRect(); requestAnimationFrame(() => n.classList.remove('enter'));
+    }
+    const [x, y] = SLOTS[i];
+    n.style.left = (x / 400 * 100) + '%'; n.style.top = ((y + 20) / 280 * 100) + '%'; n.style.zIndex = y;
+    n.classList.toggle('right', x > 230);
+  });
+  fresh.forEach(id => speak(id, 6000));
+}
+function speak(id, ms = 3200) {
+  const n = $('#crowd')?.querySelector(`.guest[data-id="${CSS.escape(id)}"]`); if (!n) return;
+  n.classList.add('talk'); clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove('talk'), ms);
+}
+let chatter = null, chatIdx = 0;
+function startChatter() {
+  clearInterval(chatter);
+  chatter = setInterval(() => {
+    const g = $('#crowd')?.querySelectorAll('.guest'); if (!g || !g.length || document.visibilityState !== 'visible') return;
+    chatIdx = (chatIdx + 1) % g.length; speak(g[chatIdx].dataset.id);
+  }, 1800);
 }
 
 // ---------- 데이터 ----------
@@ -73,7 +122,11 @@ async function loadBooths() {
 }
 async function loadGb(id) {
   const { data, error } = await sb.from('guestbook').select('id,nick,msg,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(200);
-  if (!error && route() === id) { S.gb = data; fillGb(); fillRecent(); }
+  if (!error && route() === id) {
+    const old = new Set(S.gb.map(g => g.id));
+    const fresh = S.gbLoaded === id ? data.filter(g => !old.has(g.id)).map(g => g.id) : [];
+    S.gb = data; S.gbLoaded = id; fillGb(); fillRecent(); fillRoom(fresh);
+  }
 }
 async function loadVisit(id) {
   const { data } = await sb.rpc('record_visit', { p_booth: id, p_visitor: visitor });
@@ -175,10 +228,10 @@ function renderBooth(id) {
 function renderTab(id, b) {
   const el = $('#body');
   if (S.tab === 'home') {
-    el.innerHTML = `<div class="room">${room(b)}</div>
+    el.innerHTML = `<div class="room"><span class="live"><i></i>LIVE 방명록 <b id="liveCount">${S.gb.length}</b></span>${room(b)}<div class="crowd" id="crowd"></div></div>
     <div class="two"><div class="box"><h2>새 소식</h2><p>${esc(b.news || '아직 소식이 없어요.')}</p></div>
     <div class="box"><h2>최근 방명록 <em id="gbCount">${S.gb.length}</em></h2><div id="recent"></div></div></div>`;
-    fillRecent();
+    fillRecent(); fillRoom(); if (S.gb[0]) setTimeout(() => speak(S.gb[0].id), 500);
   }
   if (S.tab === 'brand') {
     el.innerHTML = `${b.slogan ? `<p class="quote">“${esc(b.slogan)}”</p>` : ''}
@@ -382,17 +435,26 @@ function printQr(list, base) {
 }
 
 // ---------- 라우팅 ----------
-let gbTimer = null;
+let gbTimer = null, live = null;
+function stopLive() { clearInterval(gbTimer); clearInterval(chatter); if (live) { sb.removeChannel(live); live = null; } }
+function startLive(id) {
+  stopLive();
+  // 새 방명록이 들어오면 바로 다시 불러와요 (Supabase Realtime). 연결이 안 되는 환경을 위해 20초 새로고침도 함께 둬요.
+  live = sb.channel('gb-' + id)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guestbook', filter: 'booth_id=eq.' + id }, () => loadGb(id))
+    .subscribe();
+  gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) loadGb(id); }, 20000);
+  startChatter();
+}
 async function render() {
   const id = route();
   if (!sb) { app.innerHTML = `<div class="dirpanel"><div class="head"><h1>설정이 필요해요<small>config.js 에 Supabase 주소와 anon 키를 넣어 주세요.</small></h1></div></div>`; return; }
-  if (id === 'admin') { clearInterval(gbTimer); renderAdmin(); return; }
+  if (id === 'admin') { stopLive(); renderAdmin(); return; }
   document.title = '맹글아케이드 부스 미니홈피';
-  if (!id) { clearInterval(gbTimer); renderDir(); return; }
+  if (!id) { stopLive(); renderDir(); return; }
   if (id !== S.cur) {
-    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.cards = []; S.visits = { today: 0, total: 0 };
-    renderBooth(id); loadGb(id); loadVisit(id);
-    clearInterval(gbTimer); gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) loadGb(id); }, 20000);
+    S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.cards = []; S.visits = { today: 0, total: 0 };
+    renderBooth(id); loadGb(id); loadVisit(id); startLive(id);
   } else renderBooth(id);
 }
 addEventListener('hashchange', () => { if (route() !== S.cur) S.cur = null; render(); });

@@ -261,6 +261,14 @@ grant execute on function public.admin_reset_pin(text, text)                    
 grant execute on function public.admin_delete_booth(text, text)                      to anon, authenticated;
 grant execute on function public.admin_stats(text)                                   to anon, authenticated;
 
+-- ---------- 실시간 방명록 (미니룸 말풍선) ----------
+do $$ begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'guestbook') then
+    alter publication supabase_realtime add table public.guestbook;
+  end if;
+end $$;
+
 -- ---------- 사진 저장소 ----------
 -- 명함·로고 사진은 추측할 수 없는 무작위 파일명으로 저장되고, 목록 조회는 막혀 있어요.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

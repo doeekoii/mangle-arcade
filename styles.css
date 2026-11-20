@@ -158,3 +158,25 @@ textarea.mono{font:14px/1.6 "Space Grotesk","Noto Sans KR";width:100%;padding:10
   .qrcard small{font-size:10px;color:#555;word-break:break-all}
   @page{margin:10mm}
 }
+/* ---- 미니룸 실시간 손님 ---- */
+.room{position:relative}
+.gone{display:none}
+.crowd{position:absolute;inset:0;pointer-events:none}
+.live{position:absolute;top:10px;left:12px;z-index:900;display:flex;align-items:center;gap:6px;font:700 12px "Space Grotesk","Noto Sans KR";background:#111;color:#fff;border-radius:999px;padding:4px 10px}
+.live i{width:7px;height:7px;border-radius:50%;background:#fff;animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{50%{opacity:.2}}
+.guest{position:absolute;width:clamp(22px,6.5%,34px);transform:translate(-50%,-100%);transition:left .9s ease,top .9s ease,opacity .4s ease,transform .4s ease}
+.guest svg{display:block;width:100%;height:auto}
+.guest.enter{opacity:0;transform:translate(-50%,-140%)}
+.guest.talk{z-index:800!important}
+.bubble{position:absolute;bottom:calc(100% + 8px);left:50%;width:max-content;max-width:min(170px,40vw);padding:5px 10px;border:1.5px solid #111;border-radius:12px;background:#fff;color:#111;font-size:12px;line-height:1.35;
+  opacity:0;transform:translateX(-22px) scale(.6);transform-origin:22px 100%;transition:opacity .25s ease,transform .25s ease}
+.bubble b{display:block;font-size:11px;font-weight:700}
+.bubble span{display:block;overflow-wrap:anywhere}
+.bubble::after{content:"";position:absolute;top:100%;left:15px;border:6px solid transparent;border-top-color:#111}
+.guest.right .bubble{left:auto;right:50%;transform:translateX(22px) scale(.6);transform-origin:calc(100% - 22px) 100%}
+.guest.right .bubble::after{left:auto;right:15px}
+.guest.talk .bubble{opacity:1;transform:translateX(-22px) scale(1)}
+.guest.right.talk .bubble{transform:translateX(22px) scale(1)}
+@media(max-width:600px){.bubble{font-size:11px;padding:4px 8px}.live{top:8px;left:8px}}
+@media(prefers-reduced-motion:reduce){.guest,.bubble{transition:none}.live i{animation:none}}
