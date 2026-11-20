@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>맹글아케이드 부스 미니홈피</title>
+<meta name="description" content="제주대학교 맹글아케이드 — 부스 QR을 찍고 팀 소개를 보고, 방명록과 명함을 남겨 주세요.">
+<meta property="og:title" content="맹글아케이드 부스 미니홈피">
+<meta property="og:description" content="부스 QR을 찍고 팀 소개를 보고, 방명록과 명함을 남겨 주세요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap top"><a class="logo" href="#"><i>MA</i><span><b>MANGLE ARCADE</b><small>맹글아케이드 부스 미니홈피</small></span></a><a href="#">전체 부스 보기</a></div>
+<div class="wrap banner" id="banner" hidden><p id="bannerText"></p></div>
+<main id="app" class="wrap"><p class="note">불러오는 중…</p></main>
+<div class="qrsheet" id="qrsheet"></div>
+
+<dialog id="pinDlg">
+  <form id="pinForm" method="dialog">
+    <div><h3 id="pinTitle">팀 로그인</h3><p class="note" id="pinHint">운영사에서 받은 팀 PIN을 입력해 주세요.</p></div>
+    <input class="pin" id="pinInput" type="password" inputmode="numeric" autocomplete="one-time-code" aria-label="PIN" required>
+    <p class="err" id="pinErr" role="alert"></p>
+    <div class="row"><button class="btn" id="pinOk" value="ok">확인</button><button class="btn ghost" type="button" id="pinCancel">취소</button></div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
