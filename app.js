@@ -134,10 +134,17 @@ function startChatter() {
 }
 
 // ---------- 데이터 ----------
+// 부스 목록은 디렉터리·파도타기에 필요한 가벼운 정보만 불러오고 (75개 부스여도 수 KB),
+// 소개글 전체는 지금 보고 있는 부스 하나만 따로 불러와요.
 async function loadBooths() {
-  const { data, error } = await sb.from('booths').select('id,no,name,profile,logo_url,logo_fit').order('no');
+  const { data, error } = await sb.from('booths').select('id,no,name,logo_url,logo_fit,tagline:profile->>tagline,short:profile->>short').order('no');
   if (error) { note('부스 정보를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'); return; }
-  S.booths = Object.fromEntries(data.map(r => [r.id, toBooth(r)])); S.ready = true;
+  const prev = S.booths;
+  S.booths = Object.fromEntries(data.map(r => [r.id, prev[r.id]?._full ? prev[r.id] : toBooth({ ...r, profile: { tagline: r.tagline || '', short: r.short || '' } })])); S.ready = true;
+}
+async function loadBooth(id) {
+  const { data, error } = await sb.from('booths').select('id,no,name,profile,logo_url,logo_fit').eq('id', id).maybeSingle();
+  if (!error && data) { S.booths[id] = { ...toBooth(data), _full: true }; if (route() === id) renderBooth(id); }
 }
 async function loadGb(id) {
   const { data, error } = await sb.from('guestbook').select('id,nick,msg,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(200);
@@ -247,7 +254,7 @@ function renderBooth(id) {
     const pin = await askPin({ title: '팀 로그인', hint: `${b.name} 팀 PIN을 입력해 주세요. 이 기기에서는 로그아웃 전까지 유지돼요.`, check: async p => { const { data, error } = await sb.rpc('verify_pin', { p_booth: id, p_pin: p }); if (error) throw error; return data; } });
     if (pin) { store.set('pin.' + id, pin); renderBooth(id); if (S.tab === 'card') loadCards(id); }
   });
-  S.editing && team ? renderEdit(id, b) : renderTab(id, b);
+  S.editing && team && b._full ? renderEdit(id, b) : renderTab(id, b);
 }
 
 function renderTab(id, b) {
@@ -259,7 +266,8 @@ function renderTab(id, b) {
     $('#toAlbum').onclick = () => { S.tab = 'album'; renderBooth(id); };
     fillRecent(); fillStrip(); fillRoom(); if (S.gb[0]) setTimeout(() => speak(S.gb[0].id), 500);
   }
-  if (S.tab === 'brand') {
+  if (S.tab === 'brand' && !b._full) el.innerHTML = '<p class="empty">불러오는 중…</p>';
+  else if (S.tab === 'brand') {
     el.innerHTML = `${b.slogan ? `<p class="quote">“${esc(b.slogan)}”</p>` : ''}
     <div class="box"><h2>브랜드 스토리</h2><p>${esc(b.story || '아직 작성되지 않았어요.')}</p></div>
     ${lines(b.values).length ? `<div><h2>핵심 가치</h2><ul class="chips">${lines(b.values).map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>` : ''}
@@ -476,7 +484,7 @@ function renderEdit(id, b) {
       const logoUrl = logo ? await upload('logos', logo) : b.img;
       const { error } = await sb.rpc('update_booth', { p_booth: id, p_pin: pinOf(id), p_name: vals.name || b.name, p_profile: profile, p_logo_url: logoUrl, p_logo_fit: $('#fit').checked ? 'fill' : 'contain' });
       if (error) throw error;
-      await loadBooths(); S.editing = false; renderBooth(id);
+      await loadBooth(id); S.editing = false; renderBooth(id);
     } catch (err) { $('#eMsg').textContent = errMsg(err); $('#saveBtn').disabled = false; }
   };
 }
@@ -604,7 +612,7 @@ async function render() {
   if (!id) { stopLive(); renderDir(); return; }
   if (id !== S.cur) {
     S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.photos = []; S.liked = new Set(); S.cards = []; S.visits = { today: 0, total: 0 };
-    renderBooth(id); loadGb(id); loadPhotos(id); loadVisit(id); startLive(id);
+    renderBooth(id); loadBooth(id); loadGb(id); loadPhotos(id); loadVisit(id); startLive(id);
   } else renderBooth(id);
 }
 addEventListener('hashchange', () => { if (route() !== S.cur) S.cur = null; render(); });
