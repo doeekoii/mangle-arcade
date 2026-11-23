@@ -276,6 +276,8 @@ create table if not exists public.photos (
 );
 create index if not exists photos_booth_at on public.photos (booth_id, created_at desc);
 alter table public.photos add column if not exists like_count int not null default 0;
+alter table public.photos add column if not exists thumb_url text not null default ''
+  check (thumb_url = '' or thumb_url ~ '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/uploads/photos/[0-9a-f-]{36}_t\.(jpg|png|webp)$');
 alter table public.photos enable row level security;
 drop policy if exists photos_read on public.photos;
 create policy photos_read on public.photos for select to anon, authenticated using (not hidden);
@@ -285,12 +287,13 @@ revoke all on public.photos from anon, authenticated;
 grant select, insert on public.photos to anon, authenticated;
 
 -- 팀이 올린 사진 (TEAM 표시)
-create or replace function public.add_team_photo(p_booth text, p_pin text, p_url text, p_caption text)
+drop function if exists public.add_team_photo(text, text, text, text);
+create or replace function public.add_team_photo(p_booth text, p_pin text, p_url text, p_thumb text, p_caption text)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   if not _can_edit(p_booth, p_pin) then raise exception 'denied'; end if;
-  insert into photos(booth_id, url, caption, nick, by_team)
-  values (p_booth, p_url, coalesce(p_caption, ''), coalesce(nullif((select name from booths where id = p_booth), ''), '팀'), true);
+  insert into photos(booth_id, url, thumb_url, caption, nick, by_team)
+  values (p_booth, p_url, coalesce(p_thumb, ''), coalesce(p_caption, ''), coalesce(nullif((select name from booths where id = p_booth), ''), '팀'), true);
 end $$;
 
 create or replace function public.set_photo_hidden(p_booth text, p_pin text, p_id uuid, p_hidden boolean)
@@ -300,7 +303,7 @@ begin
   update photos set hidden = p_hidden where id = p_id and booth_id = p_booth;
 end $$;
 
-grant execute on function public.add_team_photo(text, text, text, text)           to anon, authenticated;
+grant execute on function public.add_team_photo(text, text, text, text, text)     to anon, authenticated;
 grant execute on function public.set_photo_hidden(text, text, uuid, boolean)       to anon, authenticated;
 
 -- ---------- 사진 좋아요 ----------

@@ -223,3 +223,27 @@ textarea.mono{font:14px/1.6 "Space Grotesk","Noto Sans KR";width:100%;padding:10
 @keyframes burst{15%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}30%{transform:translate(-50%,-50%) scale(.95)}45%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
 .lbcap{display:grid;gap:2px}
 @media(prefers-reduced-motion:reduce){.like.pop svg,.burst.go{animation:none}.burst.go{opacity:0}}
+/* ---- 11/23 수정: 행동 버튼 강조, 좋아요 오버레이, 모바일 탭 테두리 ---- */
+:root{--cta:#ff4f1f;--cta-dark:#e23d10}
+button,a,label{-webkit-tap-highlight-color:transparent}
+button:focus:not(:focus-visible),dialog:focus{outline:none}
+.btn.cta{background:var(--cta);border-color:var(--cta);color:#fff;box-shadow:0 3px 0 var(--cta-dark)}
+.btn.cta:hover{background:var(--cta-dark);border-color:var(--cta-dark)}
+.btn.cta:active{transform:translateY(2px);box-shadow:0 1px 0 var(--cta-dark)}
+.btn.cta:disabled{box-shadow:none}
+@media(max-width:600px){.btn.cta{flex:1 1 100%;justify-content:center;min-height:50px;font-size:17px}}
+.who .nick{flex:1 1 160px}
+.who [hidden]{display:none}
+/* 좋아요: 사진 위에 흰 알약 버튼 */
+.ph{position:relative}
+.like.over{position:absolute;left:8px;bottom:8px;background:#fff;color:#111;border:1.5px solid #111;border-radius:999px;padding:4px 11px 4px 8px;min-height:38px;box-shadow:0 2px 8px #0003}
+.like.over svg{width:22px;height:22px}
+.like.over.on{border-color:#ff3040}
+.like.over.big{left:14px;bottom:14px;padding:6px 14px 6px 10px;min-height:46px;font-size:16px}
+.like.over.big svg{width:28px;height:28px}
+.lblike{position:absolute;inset:auto auto 0 0;z-index:2}
+.lbstage{position:relative}
+.lc{padding:2px 8px 2px 6px;font-size:12px;box-shadow:0 2px 6px #0003}
+.lc svg{width:13px;height:13px;fill:none;stroke:#111;stroke-width:2.4}
+.lc.on svg{fill:#ff3040;stroke:#ff3040}
+.album figure .x{margin-top:2px}

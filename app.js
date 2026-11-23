@@ -8,6 +8,25 @@ const stamp = t => new Date(t).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul',
 const ADJ = ['푸른', '반짝', '용감한', '졸린', '수줍은', '신난', '느긋한', '동그란', '상큼한', '든든한'];
 const NOUN = ['말차', '감귤', '돌하르방', '동백', '한라봉', '파도', '오름', '창업가', '멘토', '유채'];
 const rnick = () => ADJ[Math.random() * ADJ.length | 0] + NOUN[Math.random() * NOUN.length | 0] + (10 + Math.random() * 90 | 0);
+// 작성자 표시: 이름 또는 닉네임 (방명록·사진첩 공통). 마지막 선택과 입력값을 기기에 기억해요.
+function whoPicker(k) {
+  const mode = store.get('whoMode') === 'nick' ? 'nick' : 'name';
+  return `<div class="row who"><div class="seg" role="radiogroup" aria-label="작성자 표시"><label><input type="radio" name="${k}mode" value="name" ${mode === 'name' ? 'checked' : ''}>이름</label><label><input type="radio" name="${k}mode" value="nick" ${mode === 'nick' ? 'checked' : ''}>닉네임</label></div>
+    <input class="nick" id="${k}Author" maxlength="20" aria-label="작성자"><button type="button" class="btn ghost small" id="${k}Reroll">새로 뽑기</button></div>`;
+}
+function bindWho(k) {
+  const inp = document.getElementById(k + 'Author'), rr = document.getElementById(k + 'Reroll');
+  const mode = () => app.querySelector(`[name=${k}mode]:checked`).value;
+  const apply = () => {
+    const m = mode(); store.set('whoMode', m);
+    if (m === 'name') { inp.placeholder = '이름을 적어 주세요'; inp.value = store.get('name') || ''; inp.autocomplete = 'name'; rr.hidden = true; }
+    else { inp.placeholder = '닉네임'; inp.value = store.get('nick') || rnick(); inp.autocomplete = 'off'; rr.hidden = false; }
+  };
+  app.querySelectorAll(`[name=${k}mode]`).forEach(r => r.onchange = apply);
+  rr.onclick = () => { inp.value = rnick(); };
+  apply();
+  return () => { const v = inp.value.trim(); if (!v) { inp.focus(); return null; } store.set(mode(), v); return v; };
+}
 const uuid = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
 
 const store = {
@@ -129,7 +148,7 @@ async function loadGb(id) {
   }
 }
 async function loadPhotos(id) {
-  const { data, error } = await sb.from('photos').select('id,url,caption,nick,by_team,like_count,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(120);
+  const { data, error } = await sb.from('photos').select('id,url,thumb_url,caption,nick,by_team,like_count,created_at').eq('booth_id', id).order('created_at', { ascending: false }).limit(120);
   if (!error && route() === id) { S.photos = data; fillStrip(); fillAlbum(); }
   const { data: mine } = await sb.rpc('my_likes', { p_booth: id, p_visitor: visitor });
   if (mine && route() === id) { S.liked = new Set(mine.map(x => typeof x === 'string' ? x : x.my_likes)); syncLikes(); }
@@ -144,20 +163,20 @@ async function loadCards(id) {
   if (error) { if (errMsg(error).includes('맞지')) { store.set('pin.' + id, null); render(); } return; }
   S.cards = data; fillCards();
 }
-async function upload(folder, blob) {
+async function upload(folder, blob, name) {
   const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
-  const path = `${folder}/${folder === 'logos' ? route() + '-' : ''}${uuid()}.${ext}`;
+  const path = `${folder}/${name || (folder === 'logos' ? route() + '-' : '') + uuid()}.${ext}`;
   const { error } = await sb.storage.from('uploads').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
   if (error) throw error;
   return sb.storage.from('uploads').getPublicUrl(path).data.publicUrl;
 }
-async function shrink(f, max = 1600) {
+async function shrink(f, max = 1600, q = .88) {
   try {
     const bm = await createImageBitmap(f); const k = Math.min(1, max / Math.max(bm.width, bm.height));
     const c = document.createElement('canvas'); c.width = bm.width * k | 0; c.height = bm.height * k | 0;
     const png = /png|svg/.test(f.type); const x = c.getContext('2d'); if (!png) { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
     x.drawImage(bm, 0, 0, c.width, c.height);
-    return await new Promise(r => c.toBlob(o => r(o || f), png ? 'image/png' : 'image/jpeg', .88));
+    return await new Promise(r => c.toBlob(o => r(o || f), png ? 'image/png' : 'image/jpeg', q));
   } catch { return f; }
 }
 
@@ -251,17 +270,14 @@ function renderTab(id, b) {
   }
   if (S.tab === 'gb') {
     el.innerHTML = `<form class="gbform" id="gbf">
-    <div class="row"><div class="seg" role="radiogroup" aria-label="작성자 표시"><label><input type="radio" name="who" value="nick" checked>닉네임</label><label><input type="radio" name="who" value="anon">익명</label></div>
-    <input class="nick" id="nick" maxlength="20" aria-label="닉네임" value="${esc(store.get('nick') || rnick())}"><button type="button" class="btn ghost small" id="reroll">새로 뽑기</button></div>
+    ${whoPicker('g')}
     <textarea id="msg" maxlength="500" required aria-label="방명록 내용" placeholder="${esc(b.name)} 팀에게 응원이나 피드백을 남겨 주세요"></textarea>
-    <div class="row"><button class="btn" id="gbBtn">방명록 남기기</button><span class="note" id="gbMsg" role="status"></span></div></form>
+    <div class="row"><button class="btn cta" id="gbBtn">방명록 남기기</button><span class="note" id="gbMsg" role="status"></span></div></form>
     <div><h2>방명록 <em id="gbCount">${S.gb.length}</em></h2><ul class="gb" id="gbList"></ul></div>`;
-    const who = () => app.querySelector('[name=who]:checked').value;
-    app.querySelectorAll('[name=who]').forEach(r => r.onchange = () => { $('#nick').disabled = $('#reroll').disabled = who() === 'anon'; });
-    $('#reroll').onclick = () => { $('#nick').value = rnick(); };
+    const author = bindWho('g');
     $('#gbf').onsubmit = async e => {
       e.preventDefault(); const msg = $('#msg').value.trim(); if (!msg) return;
-      const nick = who() === 'anon' ? '익명' : ($('#nick').value.trim() || '익명'); if (nick !== '익명') store.set('nick', nick);
+      const nick = author(); if (!nick) { $('#gbMsg').textContent = '이름이나 닉네임을 적어 주세요.'; return; }
       $('#gbBtn').disabled = true;
       const { error } = await sb.from('guestbook').insert({ booth_id: id, nick, msg });
       if (error) $('#gbMsg').textContent = errMsg(error); else { $('#msg').value = ''; $('#gbMsg').textContent = '남겼어요!'; await loadGb(id); }
@@ -298,7 +314,7 @@ function renderCard(id, b) {
     <label class="field"><span>이메일</span><input id="cMail" type="email" maxlength="80" autocomplete="email"></label>
     <label class="field"><span>남길 말</span><textarea id="cMemo" maxlength="300" placeholder="협업 제안, 관심 있는 부분 등"></textarea></label>
     <label class="check"><input type="checkbox" id="agree" required>입력한 정보와 명함 사진을 ${esc(b.name)} 팀이 열람하고 연락에 쓰는 데 동의해요. (행사 종료 후 운영사가 일괄 삭제해요)</label>
-    <div class="row"><button class="btn" id="cBtn">명함 보내기</button><span class="note" id="cMsg" role="status"></span></div></form>
+    <div class="row"><button class="btn cta" id="cBtn">명함 보내기</button><span class="note" id="cMsg" role="status"></span></div></form>
   ${team ? `<div><h2>받은 명함함 <em id="cardCount">${S.cards.length}</em></h2><p class="note" style="margin-bottom:10px">팀 로그인한 기기에서만 보여요.</p><div class="cards" id="cardList"></div></div>` : ''}`;
   let blob = null;
   $('#file').onchange = async e => { const f = e.target.files[0]; if (!f) return; blob = await shrink(f); $('#prev').src = URL.createObjectURL(blob); $('#prev').hidden = false; $('#dropTxt').hidden = true; };
@@ -330,7 +346,7 @@ function syncLikes() {
     const p = S.photos.find(x => x.id === b.dataset.like); if (!p) return;
     const on = S.liked.has(p.id); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = p.like_count || 0;
   });
-  document.querySelectorAll('[data-likes]').forEach(b => { const p = S.photos.find(x => x.id === b.dataset.likes); if (p) { b.hidden = !p.like_count; b.querySelector('span').textContent = p.like_count || 0; } });
+  document.querySelectorAll('[data-likes]').forEach(b => { const p = S.photos.find(x => x.id === b.dataset.likes); if (p) { b.classList.toggle('on', S.liked.has(p.id)); b.querySelector('span').textContent = p.like_count || 0; } });
 }
 async function toggleLike(pid, onlyLike = false) {
   const p = S.photos.find(x => x.id === pid); if (!p) return;
@@ -346,7 +362,7 @@ const sorted = () => S.sort === 'top' ? [...S.photos].sort((a, b) => (b.like_cou
 function photoMeta(p) { return `${p.by_team ? '<span class="team">TEAM</span> ' : ''}<b>${esc(p.nick)}</b> · ${stamp(p.created_at)}`; }
 function fillStrip() {
   const el = $('#strip'); if (!el) return; if ($('#phCount')) $('#phCount').textContent = S.photos.length;
-  el.innerHTML = S.photos.length ? S.photos.slice(0, 12).map((p, i) => `<button class="shot" data-open="${i}" aria-label="사진 크게 보기${p.caption ? ': ' + esc(p.caption) : ''}">${imgTag(p.url, p.caption || '부스 사진')}<em class="lc" data-likes="${esc(p.id)}" ${p.like_count ? '' : 'hidden'}>${HEART}<span>${p.like_count || 0}</span></em>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}</button>`).join('')
+  el.innerHTML = S.photos.length ? S.photos.slice(0, 12).map((p, i) => `<button class="shot" data-open="${i}" aria-label="사진 크게 보기${p.caption ? ': ' + esc(p.caption) : ''}">${imgTag(p.thumb_url || p.url, p.caption || '부스 사진')}<em class="lc${S.liked.has(p.id) ? ' on' : ''}" data-likes="${esc(p.id)}">${HEART}<span>${p.like_count || 0}</span></em>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}</button>`).join('')
     : '<p class="empty">아직 사진이 없어요. 사진첩 탭에서 첫 사진을 올려 주세요.</p>';
   el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open, S.photos));
 }
@@ -357,9 +373,8 @@ function renderAlbum(id, b) {
     <label class="drop"><span id="pDropTxt"><b>사진 고르기</b><br><span class="note">눌러서 촬영하거나 사진을 골라 주세요</span></span><span class="pprev" id="pPrev" hidden></span><input type="file" id="pFile" accept="image/*" multiple></label>
     <input class="nick" id="pCap" maxlength="80" placeholder="사진 설명 (선택)" aria-label="사진 설명" style="width:100%">
     ${team ? `<label class="check"><input type="checkbox" id="asTeam" checked>팀 사진으로 올리기 (TEAM 표시)</label>` : ''}
-    <div class="row" id="pWho"><div class="seg" role="radiogroup" aria-label="올린 사람 표시"><label><input type="radio" name="pwho" value="nick" checked>닉네임</label><label><input type="radio" name="pwho" value="anon">익명</label></div>
-    <input class="nick" id="pNick" maxlength="20" aria-label="닉네임" value="${esc(store.get('nick') || rnick())}"></div>
-    <div class="row"><button class="btn" id="pBtn">사진 올리기</button><span class="note" id="pMsg" role="status"></span></div></form>
+    <div id="pWho">${whoPicker('p')}</div>
+    <div class="row"><button class="btn cta" id="pBtn">사진 올리기</button><span class="note" id="pMsg" role="status"></span></div></form>
     <div><div class="boxhead"><h2>사진첩 <em id="phCount2">${S.photos.length}</em></h2>
     <div class="seg small" role="radiogroup" aria-label="정렬"><label><input type="radio" name="psort" value="new" ${S.sort === 'new' ? 'checked' : ''}>최신순</label><label><input type="radio" name="psort" value="top" ${S.sort === 'top' ? 'checked' : ''}>인기순</label></div></div>
     <div class="album" id="album"></div></div>`;
@@ -367,7 +382,7 @@ function renderAlbum(id, b) {
   let files = [];
   const syncWho = () => { const t = $('#asTeam')?.checked; $('#pWho').hidden = !!t; };
   $('#asTeam')?.addEventListener('change', syncWho); syncWho();
-  app.querySelectorAll('[name=pwho]').forEach(r => r.onchange = () => { $('#pNick').disabled = app.querySelector('[name=pwho]:checked').value === 'anon'; });
+  const author = bindWho('p');
   $('#pFile').onchange = async e => {
     files = [...e.target.files].slice(0, 5); if (!files.length) return;
     $('#pPrev').innerHTML = files.map(f => `<img src="${URL.createObjectURL(f)}" alt="">`).join(''); $('#pPrev').hidden = false; $('#pDropTxt').hidden = true;
@@ -376,14 +391,17 @@ function renderAlbum(id, b) {
   $('#pf').onsubmit = async e => {
     e.preventDefault(); if (!files.length) { $('#pMsg').textContent = '사진을 먼저 골라 주세요.'; return; }
     const caption = $('#pCap').value.trim(); const asTeam = !!$('#asTeam')?.checked;
-    const nick = app.querySelector('[name=pwho]:checked').value === 'anon' ? '익명' : ($('#pNick').value.trim() || '익명'); if (nick !== '익명') store.set('nick', nick);
+    const nick = asTeam ? '' : author(); if (!asTeam && !nick) { $('#pMsg').textContent = '이름이나 닉네임을 적어 주세요.'; return; }
     $('#pBtn').disabled = true;
     try {
       for (let i = 0; i < files.length; i++) {
         $('#pMsg').textContent = `올리는 중… ${i + 1}/${files.length}`;
-        const url = await upload('photos', await shrink(files[i]));
-        const { error } = asTeam ? await sb.rpc('add_team_photo', { p_booth: id, p_pin: pinOf(id), p_url: url, p_caption: caption })
-          : await sb.from('photos').insert({ booth_id: id, url, caption, nick });
+        // 원본은 크게 보기용(최대 1600px), 목록·홈 화면에는 작은 썸네일(480px)을 써서 데이터 전송량을 아껴요.
+        const key = uuid();
+        const url = await upload('photos', await shrink(files[i]), key);
+        const thumb_url = await upload('photos', await shrink(files[i], 480, .78), key + '_t');
+        const { error } = asTeam ? await sb.rpc('add_team_photo', { p_booth: id, p_pin: pinOf(id), p_url: url, p_thumb: thumb_url, p_caption: caption })
+          : await sb.from('photos').insert({ booth_id: id, url, thumb_url, caption, nick });
         if (error) throw error;
       }
       files = []; $('#pFile').value = ''; $('#pCap').value = ''; $('#pPrev').hidden = true; $('#pDropTxt').hidden = false; $('#pMsg').textContent = '올렸어요!';
@@ -397,8 +415,8 @@ function fillAlbum() {
   const el = $('#album'); if (!el) return; const id = route(); const team = !!pinOf(id);
   if ($('#phCount2')) $('#phCount2').textContent = S.photos.length;
   const list = sorted();
-  el.innerHTML = list.length ? list.map((p, i) => `<figure><button class="shot" data-open="${i}" aria-label="사진 크게 보기">${imgTag(p.url, p.caption || '부스 사진')}</button>
-    <figcaption><div class="likerow">${likeBtn(p)}${team ? `<button class="x" data-phide="${esc(p.id)}">숨기기</button>` : ''}</div>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}<small>${photoMeta(p)}</small></figcaption></figure>`).join('')
+  el.innerHTML = list.length ? list.map((p, i) => `<figure><div class="ph"><button class="shot" data-open="${i}" aria-label="사진 크게 보기">${imgTag(p.thumb_url || p.url, p.caption || '부스 사진')}</button>${likeBtn(p, 'over')}</div>
+    <figcaption>${p.caption ? `<span>${esc(p.caption)}</span>` : ''}<small>${photoMeta(p)}</small>${team ? `<button class="x" data-phide="${esc(p.id)}">숨기기</button>` : ''}</figcaption></figure>`).join('')
     : '<p class="empty">아직 사진이 없어요.</p>';
   el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openPhoto(+x.dataset.open, list));
   el.querySelectorAll('[data-phide]').forEach(x => x.onclick = async () => {
@@ -412,8 +430,10 @@ function openPhoto(i, list = lbList) {
   const dlg = $('#lightbox'); lbList = list; if (!lbList.length) return;
   lbIdx = (i + lbList.length) % lbList.length; const p = lbList[lbIdx];
   $('#lbImg').src = p.url; $('#lbImg').alt = p.caption || '부스 사진'; $('#lbImg').dataset.pid = p.id;
-  $('#lbCap').innerHTML = `<div class="likerow">${likeBtn(p, 'big')}</div>${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>${photoMeta(p)} · ${lbIdx + 1}/${lbList.length}</small>`;
-  if (!dlg.open) dlg.showModal();
+  $('#lbLike').innerHTML = likeBtn(p, 'over big');
+  $('#lbCap').innerHTML = `${p.caption ? `<p>${esc(p.caption)}</p>` : ''}<small>${photoMeta(p)} · ${lbIdx + 1}/${lbList.length}</small>`;
+  // 열릴 때 첫 버튼에 자동 포커스가 가면서 생기던 검은 테두리를 막아요
+  if (!dlg.open) { dlg.showModal(); dlg.focus(); }
 }
 // 인스타그램처럼 사진을 두 번 탭하면 좋아요
 { let last = 0;
@@ -442,7 +462,7 @@ function renderEdit(id, b) {
     const val = Array.isArray(b[k]) ? b[k].join(k === 'products' ? '\n' : ', ') : (b[k] || '');
     return `<label class="field"><span>${l}</span>${ta ? `<textarea data-k="${k}">${esc(val)}</textarea>` : `<input data-k="${k}" value="${esc(val)}" ${k === 'name' ? 'required maxlength="40"' : ''}>`}</label>`;
   }).join('')}</fieldset>`).join('')}
-  <div class="row"><button class="btn" id="saveBtn">저장</button><button type="button" class="btn ghost" id="cancel">취소</button><span class="note" id="eMsg" role="status"></span></div></form>`;
+  <div class="row"><button class="btn cta" id="saveBtn">저장</button><button type="button" class="btn ghost" id="cancel">취소</button><span class="note" id="eMsg" role="status"></span></div></form>`;
   let logo = null;
   $('#pimg').onchange = async e => { const f = e.target.files[0]; if (!f) return; logo = await shrink(f, 800); $('#lp').innerHTML = `<img src="${URL.createObjectURL(logo)}" alt="새 로고 미리보기">`; };
   $('#fit').onchange = e => $('#lp').classList.toggle('fill', e.target.checked);
@@ -556,7 +576,12 @@ function stopLive() { clearInterval(gbTimer); clearInterval(chatter); if (live) 
 function startLive(id) {
   stopLive();
   // 새 방명록이 들어오면 바로 다시 불러와요 (Supabase Realtime). 연결이 안 되는 환경을 위해 20초 새로고침도 함께 둬요.
-  live = sb.channel('gb-' + id)
+  live = channel(id);
+  gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) { loadGb(id); loadPhotos(id); } }, 20000);
+  startChatter();
+}
+function channel(id) {
+  return sb.channel('gb-' + id)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guestbook', filter: 'booth_id=eq.' + id }, () => loadGb(id))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'photos', filter: 'booth_id=eq.' + id }, () => loadPhotos(id))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'photos', filter: 'booth_id=eq.' + id }, ({ new: n }) => {
@@ -564,9 +589,13 @@ function startLive(id) {
       if (n.hidden) { loadPhotos(id); return; } p.like_count = n.like_count; syncLikes();
     })
     .subscribe();
-  gbTimer = setInterval(() => { if (document.visibilityState === 'visible' && route() === id) { loadGb(id); loadPhotos(id); } }, 20000);
-  startChatter();
 }
+// 휴대폰 화면이 꺼지거나 다른 앱으로 가면 실시간 연결을 끊어서, 동시 접속 한도를 아껴요
+document.addEventListener('visibilitychange', () => {
+  const id = route(); if (!sb || !id || id === 'admin' || id !== S.cur) return;
+  if (document.visibilityState === 'hidden') { if (live) { sb.removeChannel(live); live = null; } }
+  else if (!live) { live = channel(id); loadGb(id); loadPhotos(id); }
+});
 async function render() {
   const id = route();
   if (!sb) { app.innerHTML = `<div class="dirpanel"><div class="head"><h1>설정이 필요해요<small>config.js 에 Supabase 주소와 anon 키를 넣어 주세요.</small></h1></div></div>`; return; }
