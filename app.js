@@ -62,25 +62,25 @@ const toBooth = r => ({ ...(r.profile || {}), id: r.id, no: r.no || '', name: r.
 const fit = b => b.img && b.fit === 'fill' ? ' fill' : '';
 function monogram(b, small) {
   const t = esc((b.short || b.name || '?').replace(/\s/g, '').slice(0, 2).toUpperCase());
-  return `<svg viewBox="0 0 100 100" role="img" aria-label="${esc(b.name)} 로고 자리"><rect width="100" height="100" fill="#111"/><text x="50" y="${small ? 62 : 60}" text-anchor="middle" font-family="Space Grotesk, Noto Sans KR" font-weight="700" font-size="${small ? 34 : 30}" fill="#fff">${t}</text>${small ? '' : '<text x="50" y="84" text-anchor="middle" font-family="Noto Sans KR" font-size="8" fill="#999">로고 준비 중</text>'}</svg>`;
+  return `<svg viewBox="0 0 100 100" role="img" aria-label="${esc(b.name)} 로고 자리"><rect width="100" height="100" fill="#1877F2"/><text x="50" y="${small ? 62 : 60}" text-anchor="middle" font-family="Space Grotesk, Noto Sans KR" font-weight="700" font-size="${small ? 34 : 30}" fill="#fff">${t}</text>${small ? '' : '<text x="50" y="84" text-anchor="middle" font-family="Noto Sans KR" font-size="8" fill="#D1D8FA">로고 준비 중</text>'}</svg>`;
 }
 const imgTag = (src, alt) => src ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy">` : '';
 const thumb = (b, small) => b.img ? imgTag(b.img, b.name + ' 로고') : monogram(b, small);
 
 function room(b) {
-  const sign = esc((b.short || b.name).slice(0, 14)); const L = 'stroke="#111" stroke-width="1.6" stroke-linejoin="round"';
+  const sign = esc((b.short || b.name).slice(0, 14)); const L = 'stroke="#1877F2" stroke-width="1.6" stroke-linejoin="round"';
   return `<svg viewBox="0 -20 400 280" role="img" aria-label="${esc(b.name)} 부스 미니룸">
-<defs><pattern id="fl" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="skewX(-30)"><path d="M0 0H18V18" fill="none" stroke="#d6d6d3" stroke-width="1"/></pattern></defs>
-<polygon points="20,170 20,50 200,-18 200,100" fill="#f4f4f2" ${L}/><polygon points="200,100 200,-18 380,50 380,170" fill="#ebebe8" ${L}/>
+<defs><pattern id="fl" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="skewX(-30)"><path d="M0 0H18V18" fill="none" stroke="#D1D8FA" stroke-width="1"/></pattern></defs>
+<polygon points="20,170 20,50 200,-18 200,100" fill="#F7F8FB" ${L}/><polygon points="200,100 200,-18 380,50 380,170" fill="#ECEDF1" ${L}/>
 <polygon points="20,170 200,100 380,170 200,240" fill="#fff" ${L}/><polygon points="20,170 200,100 380,170 200,240" fill="url(#fl)"/>
 <polygon points="250,40 330,70 330,120 250,90" fill="#fff" ${L}/><line x1="290" y1="55" x2="290" y2="105" ${L}/><line x1="250" y1="65" x2="330" y2="95" ${L}/>
-<g transform="matrix(.935,-.355,0,1,48,92)"><rect width="124" height="32" rx="6" fill="#111"/><text x="62" y="21" text-anchor="middle" font-family="Space Grotesk, Noto Sans KR" font-weight="700" font-size="${sign.length > 10 ? 11 : 13}" fill="#fff">${sign}</text></g>
+<g transform="matrix(.935,-.355,0,1,48,92)"><rect width="124" height="32" rx="6" fill="#1877F2"/><text x="62" y="21" text-anchor="middle" font-family="Space Grotesk, Noto Sans KR" font-weight="700" font-size="${sign.length > 10 ? 11 : 13}" fill="#fff">${sign}</text></g>
 <ellipse cx="200" cy="214" rx="80" ry="14" fill="#0000000f"/>
-<polygon points="130,150 200,124 270,150 200,176" fill="#fff" ${L}/><polygon points="130,150 200,176 200,214 130,188" fill="#111" ${L}/><polygon points="200,176 270,150 270,188 200,214" fill="#3a3a3a" ${L}/>
-<rect x="186" y="131" width="22" height="19" rx="4" fill="#fff" ${L}/><ellipse cx="197" cy="132" rx="11" ry="4" fill="#111"/>
+<polygon points="130,150 200,124 270,150 200,176" fill="#fff" ${L}/><polygon points="130,150 200,176 200,214 130,188" fill="#1877F2" ${L}/><polygon points="200,176 270,150 270,188 200,214" fill="#0F5FC9" ${L}/>
+<rect x="186" y="131" width="22" height="19" rx="4" fill="#fff" ${L}/><ellipse cx="197" cy="132" rx="11" ry="4" fill="#1877F2"/>
 <rect x="222" y="139" width="28" height="8" rx="2" fill="#fff" ${L} transform="rotate(-20 236 143)"/>
-<g><ellipse cx="335" cy="192" rx="18" ry="5" fill="#0000000f"/><path d="M322 166h26l-4 25h-18z" fill="#fff" ${L}/><circle cx="328" cy="152" r="12" fill="#fff" ${L}/><circle cx="343" cy="146" r="13" fill="#fff" ${L}/><circle cx="336" cy="134" r="11" fill="#111"/></g>
-<g class="minime" id="roomHost"><ellipse cx="92" cy="201" rx="14" ry="4" fill="#0000000f"/><rect x="82" y="168" width="20" height="28" rx="8" fill="#111"/><circle cx="92" cy="155" r="14" fill="#fff" ${L}/><path d="M78 153q14-18 28 0" fill="#111"/><circle cx="87" cy="157" r="1.8" fill="#111"/><circle cx="97" cy="157" r="1.8" fill="#111"/></g>
+<g><ellipse cx="335" cy="192" rx="18" ry="5" fill="#0000000f"/><path d="M322 166h26l-4 25h-18z" fill="#fff" ${L}/><circle cx="328" cy="152" r="12" fill="#fff" ${L}/><circle cx="343" cy="146" r="13" fill="#fff" ${L}/><circle cx="336" cy="134" r="11" fill="#1877F2"/></g>
+<g class="minime" id="roomHost"><ellipse cx="92" cy="201" rx="14" ry="4" fill="#0000000f"/><rect x="82" y="168" width="20" height="28" rx="8" fill="#1877F2"/><circle cx="92" cy="155" r="14" fill="#fff" ${L}/><path d="M78 153q14-18 28 0" fill="#222"/><circle cx="87" cy="157" r="1.8" fill="#222"/><circle cx="97" cy="157" r="1.8" fill="#222"/></g>
 </svg>`;
 }
 
@@ -89,14 +89,14 @@ function room(b) {
 const SLOTS = [[150, 228], [255, 226], [100, 206], [300, 196], [60, 174], [292, 150]];
 const hashN = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
 function avatar(seed) {
-  const v = hashN(seed), L = 'stroke="#111" stroke-width="1.6" stroke-linejoin="round"';
+  const v = hashN(seed), L = 'stroke="#1877F2" stroke-width="1.6" stroke-linejoin="round"';
   const hair = [
-    '<path d="M4 14q8-13 16 0z" fill="#111"/>',
-    '<path d="M4 18q-1-13 8-13t8 13h-3q-1-6-5-7-4 1-5 7z" fill="#111"/>',
-    '<path d="M4 13l3-6 2 3 3-6 3 6 2-3 3 6z" fill="#111"/>',
-    '<circle cx="12" cy="4" r="3" fill="#111"/><path d="M4 13q8-10 16 0z" fill="#111"/>',
+    '<path d="M4 14q8-13 16 0z" fill="#222"/>',
+    '<path d="M4 18q-1-13 8-13t8 13h-3q-1-6-5-7-4 1-5 7z" fill="#222"/>',
+    '<path d="M4 13l3-6 2 3 3-6 3 6 2-3 3 6z" fill="#222"/>',
+    '<circle cx="12" cy="4" r="3" fill="#222"/><path d="M4 13q8-10 16 0z" fill="#222"/>',
   ][v % 4];
-  return `<svg viewBox="0 0 24 42" aria-hidden="true"><ellipse cx="12" cy="40" rx="8" ry="2.2" fill="#0000001a"/><rect x="5" y="22" width="14" height="17" rx="6" fill="${(v >> 2) % 2 ? '#111' : '#fff'}" ${L}/><circle cx="12" cy="14" r="8" fill="#fff" ${L}/>${hair}<circle cx="9" cy="15.5" r="1.1" fill="#111"/><circle cx="15" cy="15.5" r="1.1" fill="#111"/></svg>`;
+  return `<svg viewBox="0 0 24 42" aria-hidden="true"><ellipse cx="12" cy="40" rx="8" ry="2.2" fill="#0000001a"/><rect x="5" y="22" width="14" height="17" rx="6" fill="${(v >> 2) % 2 ? '#1877F2' : '#fff'}" ${L}/><circle cx="12" cy="14" r="8" fill="#fff" ${L}/>${hair}<circle cx="9" cy="15.5" r="1.1" fill="#222"/><circle cx="15" cy="15.5" r="1.1" fill="#222"/></svg>`;
 }
 function fillRoom(fresh = []) {
   const el = $('#crowd'); if (!el) return;

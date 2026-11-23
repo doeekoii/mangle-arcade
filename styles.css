@@ -247,3 +247,72 @@ button:focus:not(:focus-visible),dialog:focus{outline:none}
 .lc svg{width:13px;height:13px;fill:none;stroke:#111;stroke-width:2.4}
 .lc.on svg{fill:#ff3040;stroke:#ff3040}
 .album figure .x{margin-top:2px}
+/* =====================================================================
+   키비주얼 가이드라인 컬러 (11/23)
+   메인 #1877F2 Tech Blue · 보조 #9EA2A2 · 배경 #ECEDF1
+   글자는 읽기 쉽게 진한 남색 계열, 흐린 글자는 #9EA2A2를 어둡게 한 톤으로 대비 확보
+   ===================================================================== */
+:root{
+  --brand:#1877F2;--brand-dark:#0F5FC9;--brand-soft:#E8F1FE;
+  --bg:light-dark(#ECEDF1,#0D111A);--paper:light-dark(#ffffff,#151B27);--ink:light-dark(#0F1A2E,#EEF1F7);
+  --mute:light-dark(#6B7071,#9EA2A2);--line:light-dark(#1877F2,#4C8FF5);--hair:light-dark(#D3D5D8,#2B3342);--soft:light-dark(#F4F5F8,#1C2433);--inv:#ffffff;
+  --cta:#1877F2;--cta-dark:#0F5FC9
+}
+/* 프레임·패널: 파란 테두리, 안쪽 카드: 회색 테두리 */
+.frame,.dirpanel{border-color:var(--brand)}
+.panel{border-color:var(--hair)}
+.head{border-bottom-color:var(--brand)}
+.box,.mood,.gb li,.cards article,.album figure .shot,.strip .shot,.dir a,.adm section{border-color:var(--hair)}
+.gb .bar{background:var(--soft);border-bottom-color:var(--hair)}
+.gb .bar .n{color:var(--brand)}
+.dir a:hover{background:var(--brand-soft);border-color:var(--brand)}
+.dir .th,.photo,.logoPrev{border-color:var(--hair)}
+h2{color:var(--ink)}
+h2 em{color:var(--brand)}
+/* 로고 배지·카운터 */
+.logo i{background:var(--brand);color:#fff}
+.count div{border-color:var(--brand)}
+.count div:first-child{background:var(--brand);color:#fff}
+.count div:last-child{color:var(--brand);border-color:#9EA2A2}
+.count div:last-child span{color:#9EA2A2}
+.no{border-color:var(--brand);color:var(--brand)}
+/* 탭 */
+.tabs button{border-color:var(--hair);color:var(--ink)}
+.tabs button:hover{border-color:var(--brand)}
+.tabs button[aria-selected=true]{background:var(--brand);border-color:var(--brand);color:#fff}
+/* 버튼 */
+.btn{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.ghost{background:var(--paper);color:var(--ink);border-color:var(--hair)}
+.btn.ghost:hover{border-color:var(--brand);color:var(--brand)}
+.btn.cta{background:var(--cta);border-color:var(--cta);box-shadow:0 3px 0 var(--cta-dark)}
+.btn.cta:hover{background:var(--cta-dark);border-color:var(--cta-dark)}
+.link{color:var(--brand)}
+/* 선택 버튼·칩·체크 */
+.seg{border-color:var(--hair)}
+.seg label:has(input:checked){background:var(--brand);color:#fff}
+.chips li{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.check input{accent-color:var(--brand)}
+.team{background:var(--brand);color:#fff}
+.ok{background:var(--brand);color:#fff}
+/* 입력칸 */
+.field input,.field textarea,.gbform textarea,.edit input,.edit textarea,.nick,.pin,textarea.mono{border-color:var(--hair)}
+.field input:focus,.field textarea:focus,.gbform textarea:focus,.nick:focus,.pin:focus,textarea.mono:focus{border-color:var(--brand);outline:0;box-shadow:0 0 0 3px var(--brand-soft)}
+.drop{border-color:#9EA2A2;background:var(--soft)}
+.drop:hover{border-color:var(--brand)}
+.surf select{border-color:var(--hair)}
+:focus-visible{outline-color:var(--brand)}
+/* 미니룸·말풍선 */
+.room{border-color:var(--hair)}
+.live{background:var(--brand)}
+.bubble{border-color:var(--brand)}
+.bubble::after{border-top-color:var(--brand)}
+.bubble b{color:var(--brand)}
+/* 좋아요: 테두리는 브랜드, 누른 하트는 빨강 유지 */
+.like.over{border-color:var(--hair);color:var(--ink)}
+.lc{border-color:var(--hair)}
+/* 크게 보기·팝업 */
+dialog{border-color:var(--brand)}
+.lbbar{border-top-color:var(--hair)}
+.newpins{border-color:var(--brand);background:var(--brand-soft)}
+.tbl th{color:var(--mute)}
+@media print{.qrcard .bn{color:#1877F2}}
