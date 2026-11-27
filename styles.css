@@ -254,3 +254,11 @@ button:focus:not(:focus-visible),dialog:focus{outline:none}
 .stage-live{border:1.5px solid var(--ink);background:var(--ink);color:var(--inv)}
 .dir .bn .stage{font-size:10px;padding:2px 6px;margin-left:4px}
 .edit .seg{flex-wrap:wrap;justify-self:start}
+/* ---- LIVE 램프: 방송 부스 ON AIR 빨간불 ---- */
+.live i{width:8px;height:8px;background:#ff2b2b;box-shadow:0 0 0 0 #ff2b2b99,0 0 6px 1px #ff2b2b;animation:onair 1.6s ease-in-out infinite}
+@keyframes onair{
+  0%,45%{opacity:1;box-shadow:0 0 0 0 #ff2b2b99,0 0 6px 1px #ff2b2b}
+  60%{opacity:1;box-shadow:0 0 0 5px #ff2b2b00,0 0 10px 2px #ff2b2b}
+  75%,90%{opacity:.25;box-shadow:0 0 0 0 #ff2b2b00,0 0 0 0 #ff2b2b00}
+  100%{opacity:1;box-shadow:0 0 0 0 #ff2b2b99,0 0 6px 1px #ff2b2b}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none;opacity:1}}
