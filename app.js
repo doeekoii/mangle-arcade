@@ -65,7 +65,7 @@ const stageBadge = b => { const st = STAGES.find(([k]) => k === b.stage); return
 // ---------- 공통 그림 ----------
 const fit = b => b.img && b.fit === 'fill' ? ' fill' : '';
 function monogram(b, small) {
-  const t = esc((b.short || b.name || '?').replace(/\s/g, '').slice(0, 2).toUpperCase());
+  const t = esc((b.short || (b.name || '?').replace(/^TEAM\s+/i, '')).replace(/\s/g, '').slice(0, 2).toUpperCase());
   return `<svg viewBox="0 0 100 100" role="img" aria-label="${esc(b.name)} 로고 자리"><rect width="100" height="100" fill="#111"/><text x="50" y="${small ? 62 : 60}" text-anchor="middle" font-family="Space Grotesk, Noto Sans KR" font-weight="700" font-size="${small ? 34 : 30}" fill="#fff">${t}</text>${small ? '' : '<text x="50" y="84" text-anchor="middle" font-family="Noto Sans KR" font-size="8" fill="#999">로고 준비 중</text>'}</svg>`;
 }
 const imgTag = (src, alt) => src ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy">` : '';
