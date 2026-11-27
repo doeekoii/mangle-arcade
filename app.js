@@ -58,6 +58,10 @@ const errMsg = e => {
 };
 const toBooth = r => ({ ...(r.profile || {}), id: r.id, no: r.no || '', name: r.name, img: r.logo_url || '', fit: r.logo_fit || 'contain' });
 
+// ---------- 현재 단계 배지 ----------
+const STAGES = [['idea', '아이디어'], ['proto', '시제품'], ['live', '운영 중']];
+const stageBadge = b => { const st = STAGES.find(([k]) => k === b.stage); return st ? `<span class="stage stage-${st[0]}">${st[1]}</span>` : ''; };
+
 // ---------- 공통 그림 ----------
 const fit = b => b.img && b.fit === 'fill' ? ' fill' : '';
 function monogram(b, small) {
@@ -137,10 +141,10 @@ function startChatter() {
 // 부스 목록은 디렉터리·파도타기에 필요한 가벼운 정보만 불러오고 (75개 부스여도 수 KB),
 // 소개글 전체는 지금 보고 있는 부스 하나만 따로 불러와요.
 async function loadBooths() {
-  const { data, error } = await sb.from('booths').select('id,no,name,logo_url,logo_fit,tagline:profile->>tagline,short:profile->>short').order('no');
+  const { data, error } = await sb.from('booths').select('id,no,name,logo_url,logo_fit,tagline:profile->>tagline,short:profile->>short,stage:profile->>stage').order('no');
   if (error) { note('부스 정보를 불러오지 못했어요. 잠시 후 새로고침해 주세요.'); return; }
   const prev = S.booths;
-  S.booths = Object.fromEntries(data.map(r => [r.id, prev[r.id]?._full ? prev[r.id] : toBooth({ ...r, profile: { tagline: r.tagline || '', short: r.short || '' } })])); S.ready = true;
+  S.booths = Object.fromEntries(data.map(r => [r.id, prev[r.id]?._full ? prev[r.id] : toBooth({ ...r, profile: { tagline: r.tagline || '', short: r.short || '', stage: r.stage || '' } })])); S.ready = true;
 }
 async function loadBooth(id) {
   const { data, error } = await sb.from('booths').select('id,no,name,profile,logo_url,logo_fit').eq('id', id).maybeSingle();
@@ -212,7 +216,7 @@ function renderDir() {
   const list = Object.values(S.booths).sort((a, b) => String(a.no).localeCompare(String(b.no), 'ko', { numeric: true }));
   app.innerHTML = `<div class="dirpanel">
   <div class="head"><h1>부스 디렉터리<small>부스의 QR을 찍으면 그 팀 미니홈피로 바로 연결돼요</small></h1></div>
-  ${list.length ? `<ul class="dir">${list.map(b => `<li><a href="#${esc(b.id)}"><span class="th${fit(b)}">${thumb(b, 1)}</span><span><span class="bn">BOOTH ${esc(b.no || '--')}</span><b>${esc(b.name)}</b><small>${esc(b.tagline || '')}</small></span></a></li>`).join('')}</ul>`
+  ${list.length ? `<ul class="dir">${list.map(b => `<li><a href="#${esc(b.id)}"><span class="th${fit(b)}">${thumb(b, 1)}</span><span><span class="bn">BOOTH ${esc(b.no || '--')} ${stageBadge(b)}</span><b>${esc(b.name)}</b><small>${esc(b.tagline || '')}</small></span></a></li>`).join('')}</ul>`
       : `<p class="empty">${S.ready ? '아직 등록된 부스가 없어요.' : '부스 목록을 불러오는 중이에요…'}</p>`}
   </div>`;
 }
@@ -223,7 +227,7 @@ function renderBooth(id) {
   if (!b) { app.innerHTML = `<div class="dirpanel"><p class="empty">${S.ready ? '이 주소의 부스를 찾을 수 없어요.' : '미니홈피를 불러오는 중이에요…'}</p><a class="btn ghost" href="#" style="justify-self:start">전체 부스 보기</a></div>`; return; }
   const team = !!pinOf(id);
   const others = Object.values(S.booths).filter(o => o.id !== id).sort((a, c) => String(a.no).localeCompare(String(c.no), 'ko', { numeric: true }));
-  const T = [['home', '홈'], ['brand', '브랜드'], ['gb', '방명록'], ['card', '명함'], ['album', '사진첩']];
+  const T = [['home', '홈'], ['brand', '소개'], ['gb', '방명록'], ['card', '명함'], ['album', '사진첩']];
   document.title = `${b.name}의 미니홈피 · 맹글아케이드`;
   app.innerHTML = `<div class="frame">
   <aside class="panel side">
@@ -232,7 +236,7 @@ function renderBooth(id) {
     <div class="mood"><span>오늘의 기분</span><br>${esc(b.mood || '—')}</div>
     <p class="intro" style="margin:0;font-size:14px">${esc(b.intro || '')}</p>
     <ul class="meta">
-      ${b.founders ? `<li><span>대표</span>${esc(b.founders)}</li>` : ''}${b.founded ? `<li><span>설립</span>${esc(b.founded)}</li>` : ''}
+      ${b.founders ? `<li><span>팀원</span>${esc(b.founders)}</li>` : ''}${b.founded ? `<li><span>시작</span>${esc(b.founded)}</li>` : ''}
       ${b.insta ? `<li><span>인스타</span><a href="https://instagram.com/${esc(b.insta.replace(/^@/, ''))}" target="_blank" rel="noopener">@${esc(b.insta.replace(/^@/, ''))}</a></li>` : ''}
       ${b.web ? `<li><span>웹</span><a href="${esc(/^https?:/.test(b.web) ? b.web : 'https://' + b.web)}" target="_blank" rel="noopener">${esc(b.web.replace(/^https?:\/\//, ''))}</a></li>` : ''}
     </ul>
@@ -240,7 +244,7 @@ function renderBooth(id) {
   </aside>
   <section class="panel main">
     <div class="head"><h1>${esc(b.name)}의 미니홈피<small>${esc(b.tagline || '')}</small></h1>
-      <div class="row">${b.no ? `<span class="no">BOOTH ${esc(b.no)}</span>` : ''}
+      <div class="row">${b.no ? `<span class="no">BOOTH ${esc(b.no)}</span>` : ''}${stageBadge(b)}
       ${team ? `<button class="btn ghost small" id="editBtn">${S.editing ? '닫기' : '관리'}</button><button class="btn ghost small" id="logout">로그아웃</button>` : `<button class="btn ghost small" id="login">팀 로그인</button>`}</div></div>
     <div id="body" class="main"></div>
   </section>
@@ -269,12 +273,12 @@ function renderTab(id, b) {
   if (S.tab === 'brand' && !b._full) el.innerHTML = '<p class="empty">불러오는 중…</p>';
   else if (S.tab === 'brand') {
     el.innerHTML = `${b.slogan ? `<p class="quote">“${esc(b.slogan)}”</p>` : ''}
-    <div class="box"><h2>브랜드 스토리</h2><p>${esc(b.story || '아직 작성되지 않았어요.')}</p></div>
-    ${lines(b.values).length ? `<div><h2>핵심 가치</h2><ul class="chips">${lines(b.values).map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>` : ''}
-    <div class="two">${lines(b.products).length ? `<div class="box"><h2>제품 · 서비스</h2><ul class="list">${lines(b.products).map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>` : ''}
-    ${lines(b.certs).length || b.impact ? `<div class="box"><h2>인증 · 임팩트</h2>${lines(b.certs).length ? `<ul class="chips" style="margin-bottom:10px">${lines(b.certs).map(v => `<li>${esc(v)}</li>`).join('')}</ul>` : ''}<p>${esc(b.impact || '')}</p></div>` : ''}</div>
-    <ul class="meta">${b.regions ? `<li><span>지역</span>${esc(b.regions)}</li>` : ''}${b.company ? `<li><span>회사</span>${esc(b.company)}</li>` : ''}</ul>
-    ${id === 'supermatcha' ? '<p class="note">테스트용 예시 — 슈퍼말차 공식 홈페이지 브랜드 스토리를 요약해 넣었어요.</p>' : ''}`;
+    <div class="box"><h2>우리가 풀고 싶은 문제</h2><p>${esc(b.story || '아직 작성되지 않았어요.')}</p></div>
+    ${lines(b.values).length ? `<div><h2>핵심 키워드</h2><ul class="chips">${lines(b.values).map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>` : ''}
+    <div class="two">${lines(b.products).length ? `<div class="box"><h2>해결 방법 · 시제품</h2><ul class="list">${lines(b.products).map(v => `<li>${esc(v)}</li>`).join('')}</ul></div>` : ''}
+    ${lines(b.certs).length || b.impact ? `<div class="box"><h2>성과 · 앞으로의 계획</h2>${lines(b.certs).length ? `<ul class="chips" style="margin-bottom:10px">${lines(b.certs).map(v => `<li>${esc(v)}</li>`).join('')}</ul>` : ''}<p>${esc(b.impact || '')}</p></div>` : ''}</div>
+    <ul class="meta">${b.regions ? `<li><span>활동 지역</span>${esc(b.regions)}</li>` : ''}${b.company ? `<li><span>소속</span>${esc(b.company)}</li>` : ''}</ul>
+    ${id === 'supermatcha' ? '<p class="note">테스트용 예시 — 슈퍼말차 공식 홈페이지 브랜드 소개를 요약해 넣었어요.</p>' : ''}`;
   }
   if (S.tab === 'gb') {
     el.innerHTML = `<form class="gbform" id="gbf">
@@ -455,10 +459,11 @@ $('#lbClose').onclick = () => $('#lightbox').close();
 $('#lightbox').addEventListener('click', e => { if (e.target.id === 'lightbox') $('#lightbox').close(); });
 $('#lightbox').addEventListener('keydown', e => { if (e.key === 'ArrowLeft') openPhoto(lbIdx - 1); if (e.key === 'ArrowRight') openPhoto(lbIdx + 1); });
 
-const FIELDS = [['기본', [['name', '부스(팀) 이름'], ['short', '미니룸 간판 문구 (짧게)'], ['tagline', '한 줄 소개'], ['mood', '오늘의 기분'], ['intro', '짧은 소개']]],
-['브랜드', [['slogan', '슬로건'], ['story', '브랜드 스토리', 1], ['values', '핵심 가치 (쉼표로 구분)'], ['products', '제품·서비스 (한 줄에 하나)', 1], ['certs', '인증 (쉼표로 구분)'], ['impact', '임팩트', 1]]],
-['정보', [['founders', '대표'], ['founded', '설립'], ['regions', '지역'], ['company', '회사'], ['insta', '인스타 아이디'], ['web', '웹사이트']]]];
-const PROFILE_KEYS = FIELDS.flatMap(([, fs]) => fs.map(f => f[0])).filter(k => k !== 'name');
+// [키, 항목 이름, 여러 줄 여부, 예시]  — 키는 그대로 두고 이름만 창업 행사에 맞게 (브랜드·개인 참가자 모두 쓸 수 있게)
+const FIELDS = [['기본', [['name', '부스 이름 (팀명·브랜드명·프로젝트명)', 0, '예: 귤밭매칭 (가칭)'], ['short', '미니룸 간판 문구 (짧게, 영문 추천)', 0, '예: GYULBAT'], ['tagline', '한 줄 소개', 0, '예: 제주 감귤 농가와 일손을 잇는 매칭 서비스'], ['mood', '오늘의 기분', 0, '예: 첫 피드백 기다리는 중!'], ['intro', '짧은 자기소개', 0, '예: 제주대 경영학과 3학년, 농가 출신 창업 준비생이에요']]],
+['아이디어', [['slogan', '슬로건 (선택)', 0, ''], ['story', '우리가 풀고 싶은 문제', 1, '어떤 사람이 어떤 불편을 겪고 있는지 적어 주세요'], ['values', '핵심 키워드 (쉼표로 구분)', 0, '예: 지역상생, 일손부족, 매칭'], ['products', '해결 방법 · 시제품 (한 줄에 하나)', 1, '예: 농가-구직자 매칭 앱 (시제품 개발 중)'], ['certs', '성과·수상·인증 (쉼표로 구분, 선택)', 0, '예: 2025 제주 창업경진대회 장려상'], ['impact', '앞으로의 계획 (선택)', 1, '예: 내년 감귤 수확철 시범 운영']]],
+['정보', [['founders', '대표·팀원', 0, '예: 홍길동, 김제주'], ['founded', '시작 시기', 0, '예: 2025.03'], ['regions', '활동 지역', 0, '예: 제주시'], ['company', '소속 (선택)', 0, '예: 제주대학교 창업동아리'], ['insta', '인스타 아이디 (@ 없이)', 0, ''], ['web', '웹사이트 (선택)', 0, '']]]];
+const PROFILE_KEYS = [...FIELDS.flatMap(([, fs]) => fs.map(f => f[0])).filter(k => k !== 'name'), 'stage'];
 
 function renderEdit(id, b) {
   const el = $('#body');
@@ -466,9 +471,11 @@ function renderEdit(id, b) {
   <fieldset><legend>로고 (프로필 사진)</legend><div class="row"><div class="logoPrev${fit(b)}" id="lp">${thumb(b, 1)}</div><div style="flex:1 1 180px;display:grid;gap:8px"><input type="file" id="pimg" accept="image/png,image/jpeg,image/webp" aria-label="로고 파일">
   <label class="check"><input type="checkbox" id="fit" ${b.fit === 'fill' ? 'checked' : ''}>로고에 배경색이 있으면 칸을 가득 채우기</label>
   <p class="note">정사각형 PNG를 권장해요. 배경이 투명하거나 흰 로고는 흰 바탕 위에 여백을 두고 보여요.</p></div></div></fieldset>
-  ${FIELDS.map(([g, fs]) => `<fieldset><legend>${g}</legend>${fs.map(([k, l, ta]) => {
+  <fieldset><legend>현재 단계</legend><div class="seg" role="radiogroup" aria-label="현재 단계">${STAGES.map(([k, l]) => `<label><input type="radio" name="stage" value="${k}" ${b.stage === k ? 'checked' : ''}>${l}</label>`).join('')}</div>
+  <p class="note">부스 이름 옆에 배지로 보여요. 아이디어만 있어도 괜찮아요.</p></fieldset>
+  ${FIELDS.map(([g, fs]) => `<fieldset><legend>${g}</legend>${fs.map(([k, l, ta, ex]) => {
     const val = Array.isArray(b[k]) ? b[k].join(k === 'products' ? '\n' : ', ') : (b[k] || '');
-    return `<label class="field"><span>${l}</span>${ta ? `<textarea data-k="${k}">${esc(val)}</textarea>` : `<input data-k="${k}" value="${esc(val)}" ${k === 'name' ? 'required maxlength="40"' : ''}>`}</label>`;
+    return `<label class="field"><span>${l}</span>${ta ? `<textarea data-k="${k}" placeholder="${esc(ex)}">${esc(val)}</textarea>` : `<input data-k="${k}" value="${esc(val)}" placeholder="${esc(ex)}" ${k === 'name' ? 'required maxlength="40"' : ''}>`}</label>`;
   }).join('')}</fieldset>`).join('')}
   <div class="row"><button class="btn cta" id="saveBtn">저장</button><button type="button" class="btn ghost" id="cancel">취소</button><span class="note" id="eMsg" role="status"></span></div></form>`;
   let logo = null;
@@ -478,6 +485,8 @@ function renderEdit(id, b) {
   $('#ef').onsubmit = async e => {
     e.preventDefault(); const vals = {};
     app.querySelectorAll('[data-k]').forEach(x => { const k = x.dataset.k; vals[k] = ['values', 'products', 'certs'].includes(k) ? lines(x.value) : x.value.trim(); });
+    vals.insta = (vals.insta || '').replace(/^@+/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
+    vals.stage = app.querySelector('[name=stage]:checked')?.value || '';
     const profile = Object.fromEntries(PROFILE_KEYS.map(k => [k, vals[k]]));
     $('#saveBtn').disabled = true; $('#eMsg').textContent = '저장 중…';
     try {

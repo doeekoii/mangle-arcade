@@ -247,3 +247,10 @@ button:focus:not(:focus-visible),dialog:focus{outline:none}
 .lc svg{width:13px;height:13px;fill:none;stroke:#111;stroke-width:2.4}
 .lc.on svg{fill:#ff3040;stroke:#ff3040}
 .album figure .x{margin-top:2px}
+/* ---- 현재 단계 배지 ---- */
+.stage{display:inline-block;font:700 12px/1 "Noto Sans KR";border-radius:999px;padding:5px 10px;white-space:nowrap;vertical-align:1px}
+.stage-idea{border:1.5px dashed var(--line);color:var(--ink);background:var(--paper)}
+.stage-proto{border:1.5px solid var(--line);color:var(--ink);background:var(--soft)}
+.stage-live{border:1.5px solid var(--ink);background:var(--ink);color:var(--inv)}
+.dir .bn .stage{font-size:10px;padding:2px 6px;margin-left:4px}
+.edit .seg{flex-wrap:wrap;justify-self:start}
