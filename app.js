@@ -228,7 +228,7 @@ function renderBooth(id) {
   const team = !!pinOf(id);
   const others = Object.values(S.booths).filter(o => o.id !== id).sort((a, c) => String(a.no).localeCompare(String(c.no), 'ko', { numeric: true }));
   const T = [['home', '홈'], ['brand', '소개'], ['gb', '방명록'], ['card', '명함'], ['album', '사진첩']];
-  document.title = `${b.name}의 미니홈피 · 맹글아케이드`;
+  document.title = `${b.name}의 미니홈피 · 멩글아케이드`;
   app.innerHTML = `<div class="frame">
   <aside class="panel side">
     <div class="count"><div><span>TODAY</span><b id="cToday">${S.visits.today}</b></div><div><span>TOTAL</span><b id="cTotal">${S.visits.total}</b></div></div>
@@ -501,7 +501,7 @@ function renderEdit(id, b) {
 // ---------- 화면: 운영사 관리자 ----------
 const adminPin = () => sess.get('admin');
 async function renderAdmin() {
-  document.title = '관리자 · 맹글아케이드';
+  document.title = '관리자 · 멩글아케이드';
   const { data: st } = await sb.rpc('admin_status');
   if (st && !st.initialized) {
     app.innerHTML = `<div class="dirpanel"><div class="head"><h1>관리자 비밀번호 만들기<small>처음 한 번만 설정해요. 8자 이상, 다른 사람이 짐작하기 어렵게 정해 주세요.</small></h1></div>
@@ -617,7 +617,7 @@ async function render() {
   const id = route();
   if (!sb) { app.innerHTML = `<div class="dirpanel"><div class="head"><h1>설정이 필요해요<small>config.js 에 Supabase 주소와 anon 키를 넣어 주세요.</small></h1></div></div>`; return; }
   if (id === 'admin') { stopLive(); renderAdmin(); return; }
-  document.title = '맹글아케이드 부스 미니홈피';
+  document.title = '멩글아케이드 부스 미니홈피';
   if (!id) { stopLive(); renderDir(); return; }
   if (id !== S.cur) {
     S.cur = id; S.tab = 'home'; S.editing = false; S.gb = []; S.gbLoaded = null; S.photos = []; S.liked = new Set(); S.cards = []; S.visits = { today: 0, total: 0 };

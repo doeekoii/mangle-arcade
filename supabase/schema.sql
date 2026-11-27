@@ -1,5 +1,5 @@
 -- =====================================================================
--- 맹글아케이드 부스 미니홈피 — Supabase 스키마
+-- 멩글아케이드 부스 미니홈피 — Supabase 스키마
 -- Supabase 대시보드 → SQL Editor → 새 쿼리에 이 파일 전체를 붙여넣고 Run.
 -- 여러 번 실행해도 안전하도록 작성돼 있어요.
 -- 비밀번호(관리자·팀 PIN)는 이 파일에 들어 있지 않아요.
@@ -382,6 +382,6 @@ insert into public.booths (id, no, name, logo_url, logo_fit, profile) values (
     'company', '주식회사 힛더티 (서울 성동구)',
     'insta', 'supermatcha.official',
     'web', 'https://supermatcha.com',
-    'news', '맹글아케이드 부스 미니홈피 테스트 중이에요. 방명록과 명함을 남겨 보세요.'
+    'news', '멩글아케이드 부스 미니홈피 테스트 중이에요. 방명록과 명함을 남겨 보세요.'
   )
 ) on conflict (id) do nothing;
